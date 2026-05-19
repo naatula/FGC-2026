@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FGC 2026 – Igniting Innovation Score Calculator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f14;
+      --surface: #1a1a24;
+      --surface2: #22223a;
+      --border: #2e2e48;
+      --text: #e8e8f0;
+      --muted: #888899;
+      --red: #e8394a;
+      --red-dim: #5a1520;
+      --red-glow: rgba(232,57,74,0.2);
+      --blue: #3a7fe8;
+      --blue-dim: #152050;
+      --blue-glow: rgba(58,127,232,0.2);
+      --gold: #f0b840;
+      --green: #40c080;
+      --radius: 10px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 24px 0 28px;
+    }
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    header p {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+
+    /* Score banner */
+    .scores {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 16px;
+      max-width: 900px;
+      margin: 0 auto 28px;
+      align-items: center;
+    }
+    .score-card {
+      border-radius: var(--radius);
+      padding: 18px 24px;
+      text-align: center;
+    }
+    .score-card.red { background: var(--red-dim); border: 2px solid var(--red); }
+    .score-card.blue { background: var(--blue-dim); border: 2px solid var(--blue); }
+    .score-card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .score-card .value {
+      font-size: 3rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 4px 0;
+    }
+    .score-card.red .value { color: var(--red); }
+    .score-card.blue .value { color: var(--blue); }
+    .score-card .breakdown {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.6;
+      text-align: left;
+    }
+    .score-card .breakdown span { display: block; }
+    .score-card .breakdown .winner-tag {
+      display: inline-block;
+      background: var(--gold);
+      color: #111;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-top: 6px;
+      letter-spacing: 0.05em;
+    }
+    .vs {
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    /* Main grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 20px;
+      border: 1px solid var(--border);
+    }
+    .panel.red { border-top: 3px solid var(--red); }
+    .panel.blue { border-top: 3px solid var(--blue); }
+    .panel h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 18px;
+    }
+    .panel.red h2 { color: var(--red); }
+    .panel.blue h2 { color: var(--blue); }
+
+    .full-width {
+      grid-column: 1 / -1;
+      border-top: 3px solid var(--green);
+    }
+    .full-width h2 { color: var(--green); }
+
+    .field {
+      margin-bottom: 16px;
+    }
+    .field label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    /* Slider + number combo */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    input[type=range] {
+      flex: 1;
+      accent-color: var(--gold);
+      height: 4px;
+      cursor: pointer;
+    }
+    input[type=number] {
+      width: 70px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+    input[type=number]:focus { outline: 1px solid var(--gold); }
+
+    /* Climb buttons */
+    .climb-group {
+      margin-bottom: 10px;
+    }
+    .climb-group .robot-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .btn-group {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .btn-group button {
+      flex: 1;
+      min-width: 52px;
+      padding: 6px 2px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-group button:hover { border-color: var(--text); color: var(--text); }
+    .btn-group button.active {
+      background: var(--surface2);
+      border-color: var(--gold);
+      color: var(--gold);
+      box-shadow: 0 0 0 1px var(--gold);
+    }
+
+    /* Partner climb stepper */
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .stepper button {
+      width: 32px;
+      height: 32px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 1.2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .stepper button:hover { border-color: var(--gold); }
+    .stepper .step-val {
+      font-size: 1.3rem;
+      font-weight: 700;
+      min-width: 24px;
+      text-align: center;
+    }
+    .stepper .step-pts {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* Fouls */
+    .foul-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .foul-row .field { flex: 1; margin-bottom: 0; }
+    .foul-row input[type=number] { width: 100%; }
+
+    /* Coopertition info */
+    .coopbox {
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .coopbox .coop-stat {
+      text-align: center;
+      flex: 1;
+    }
+    .coopbox .coop-stat .num {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--green);
+    }
+    .coopbox .coop-stat .lbl {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .coop-bonus-display {
+      flex: 2;
+      text-align: center;
+    }
+    .coop-bonus-display .pts {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--green);
+    }
+    .coop-bonus-display .desc {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 14px 0;
+    }
+
+    @media (max-width: 640px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .scores { grid-template-columns: 1fr; }
+      .vs { display: none; }
+      .score-card { padding: 14px; }
+      .score-card .value { font-size: 2.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>FGC 2026 · Igniting Innovation</h1>
+  <p>Score Calculator — scores update in real time</p>
+</header>
+
+<!-- Score Banner -->
+<div class="scores">
+  <div class="score-card red">
+    <div class="label">Red Alliance</div>
+    <div class="value" id="red-score">0</div>
+    <div class="breakdown" id="red-breakdown"></div>
+  </div>
+  <div class="vs">VS</div>
+  <div class="score-card blue">
+    <div class="label">Blue Alliance</div>
+    <div class="value" id="blue-score">0</div>
+    <div class="breakdown" id="blue-breakdown"></div>
+  </div>
+</div>
+
+<div class="main-grid">
+
+  <!-- RED ALLIANCE -->
+  <div class="panel red">
+    <h2>Red Alliance</h2>
+
+    <div class="field">
+      <label>Suppression Unit — Wildfire Contained</label>
+      <div class="slider-row">
+        <input type="range" min="0" max="500" value="0" id="red-suppression-slider">
+        <input type="number" min="0" max="500" value="0" id="red-suppression-num">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Robot Climb Positions</label>
+      <div class="climb-group">
+        <div class="robot-label">Robot 1</div>
+        <div class="btn-group" id="red-robot1">
+          <button class="active" data-val="none">None</button>
+          <button data-val="contact">Contact</button>
+          <button data-val="zone1">Zone 1</button>
+          <button data-val="zone2">Zone 2</button>
+          <button data-val="zone3">Zone 3</button>
+        </div>
+      </div>
+      <div class="climb-group">
+        <div class="robot-label">Robot 2</div>
+        <div class="btn-group" id="red-robot2">
+          <button class="active" data-val="none">None</button>
+          <button data-val="contact">Contact</button>
+          <button data-val="zone1">Zone 1</button>
+          <button data-val="zone2">Zone 2</button>
+          <button data-val="zone3">Zone 3</button>
+        </div>
+      </div>
+      <div class="climb-group">
+        <div class="robot-label">Robot 3</div>
+        <div class="btn-group" id="red-robot3">
+          <button class="active" data-val="none">None</button>
+          <button data-val="contact">Contact</button>
+          <button data-val="zone1">Zone 1</button>
+          <button data-val="zone2">Zone 2</button>
+          <button data-val="zone3">Zone 3</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Partner Climbs (robots supported by a climbing robot)</label>
+      <div class="stepper">
+        <button id="red-partner-dec">−</button>
+        <div class="step-val" id="red-partner-val">0</div>
+        <button id="red-partner-inc">+</button>
+        <span class="step-pts" id="red-partner-pts">0 pts</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Fouls received (points awarded to Blue)</label>
+      <div class="foul-row">
+        <div class="field">
+          <label>Minor Fouls (5%)</label>
+          <input type="number" min="0" max="20" value="0" id="red-minor-fouls">
+        </div>
+        <div class="field">
+          <label>Major Fouls (10%)</label>
+          <input type="number" min="0" max="20" value="0" id="red-major-fouls">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BLUE ALLIANCE -->
+  <div class="panel blue">
+    <h2>Blue Alliance</h2>
+
+    <div class="field">
+      <label>Suppression Unit — Wildfire Contained</label>
+      <div class="slider-row">
+        <input type="range" min="0" max="500" value="0" id="blue-suppression-slider">
+        <input type="number" min="0" max="500" value="0" id="blue-suppression-num">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Robot Climb Positions</label>
+      <div class="climb-group">
+        <div class="robot-label">Robot 1</div>
+        <div class="btn-group" id="blue-robot1">
+          <button class="active" data-val="none">None</button>
+          <button data-val="contact">Contact</button>
+          <button data-val="zone1">Zone 1</button>
+          <button data-val="zone2">Zone 2</button>
+          <button data-val="zone3">Zone 3</button>
+        </div>
+      </div>
+      <div class="climb-group">
+        <div class="robot-label">Robot 2</div>
+        <div class="btn-group" id="blue-robot2">
+          <button class="active" data-val="none">None</button>
+          <button data-val="contact">Contact</button>
+          <button data-val="zone1">Zone 1</button>
+          <button data-val="zone2">Zone 2</button>
+          <button data-val="zone3">Zone 3</button>
+        </div>
+      </div>
+      <div class="climb-group">
+        <div class="robot-label">Robot 3</div>
+        <div class="btn-group" id="blue-robot3">
+          <button class="active" data-val="none">None</button>
+          <button data-val="contact">Contact</button>
+          <button data-val="zone1">Zone 1</button>
+          <button data-val="zone2">Zone 2</button>
+          <button data-val="zone3">Zone 3</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Partner Climbs (robots supported by a climbing robot)</label>
+      <div class="stepper">
+        <button id="blue-partner-dec">−</button>
+        <div class="step-val" id="blue-partner-val">0</div>
+        <button id="blue-partner-inc">+</button>
+        <span class="step-pts" id="blue-partner-pts">0 pts</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Fouls received (points awarded to Red)</label>
+      <div class="foul-row">
+        <div class="field">
+          <label>Minor Fouls (5%)</label>
+          <input type="number" min="0" max="20" value="0" id="blue-minor-fouls">
+        </div>
+        <div class="field">
+          <label>Major Fouls (10%)</label>
+          <input type="number" min="0" max="20" value="0" id="blue-major-fouls">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GLOBAL ALLIANCE (full width) -->
+  <div class="panel full-width">
+    <h2>Global Alliance</h2>
+
+    <div class="field">
+      <label>Extinguisher — Wildfire Contained (shared by both alliances)</label>
+      <div class="slider-row">
+        <input type="range" min="0" max="500" value="0" id="ext-slider">
+        <input type="number" min="0" max="500" value="0" id="ext-num">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Coopertition® Bonus — Zone 3 robots across both alliances</label>
+      <div class="coopbox">
+        <div class="coop-stat">
+          <div class="num" id="coop-z3-red">0</div>
+          <div class="lbl">Red Zone 3</div>
+        </div>
+        <div class="coop-stat">
+          <div class="num" id="coop-z3-blue">0</div>
+          <div class="lbl">Blue Zone 3</div>
+        </div>
+        <div class="coop-stat">
+          <div class="num" id="coop-z3-total">0</div>
+          <div class="lbl">Total Zone 3</div>
+        </div>
+        <div class="coop-bonus-display">
+          <div class="pts" id="coop-bonus-pts">0</div>
+          <div class="desc" id="coop-bonus-desc">Coopertition® Bonus Points<br>(need 4+ robots in Zone 3)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const CLIMB_INCREMENTS = { none: 0, contact: 0.05, zone1: 0.10, zone2: 0.20, zone3: 0.30 };
+
+  const state = {
+    red: {
+      suppression: 0,
+      robots: ['none', 'none', 'none'],
+      partnerClimbs: 0,
+      minorFouls: 0,
+      majorFouls: 0,
+    },
+    blue: {
+      suppression: 0,
+      robots: ['none', 'none', 'none'],
+      partnerClimbs: 0,
+      minorFouls: 0,
+      majorFouls: 0,
+    },
+    extinguisher: 0,
+  };
+
+  function climbMultiplier(robots) {
+    return 1.0 + robots.reduce((sum, r) => sum + CLIMB_INCREMENTS[r], 0);
+  }
+
+  function zone3Count(robots) {
+    return robots.filter(r => r === 'zone3').length;
+  }
+
+  function coopertitionBonus(total) {
+    if (total >= 6) return 40;
+    if (total >= 5) return 25;
+    if (total >= 4) return 10;
+    return 0;
+  }
+
+  function calculateScores() {
+    const redMult = climbMultiplier(state.red.robots);
+    const blueMult = climbMultiplier(state.blue.robots);
+
+    const redZ3 = zone3Count(state.red.robots);
+    const blueZ3 = zone3Count(state.blue.robots);
+    const totalZ3 = redZ3 + blueZ3;
+    const coopBonus = coopertitionBonus(totalZ3);
+
+    const ext = state.extinguisher;
+
+    const redSuppPts = state.red.suppression * redMult;
+    const blueSuppPts = state.blue.suppression * blueMult;
+    const redPartnerPts = state.red.partnerClimbs * 25;
+    const bluePartnerPts = state.blue.partnerClimbs * 25;
+
+    const redPrePenalty = redSuppPts + redPartnerPts + ext + coopBonus;
+    const bluePrePenalty = blueSuppPts + bluePartnerPts + ext + coopBonus;
+
+    // Foul penalty: % of OFFENDING alliance's pre-penalty score → awarded to OPPOSING alliance
+    const redFoulPct = state.red.minorFouls * 0.05 + state.red.majorFouls * 0.10;
+    const blueFoulPct = state.blue.minorFouls * 0.05 + state.blue.majorFouls * 0.10;
+
+    const redFoulAwardedToBlue = redPrePenalty * redFoulPct;
+    const blueFoulAwardedToRed = bluePrePenalty * blueFoulPct;
+
+    const redFinal = Math.ceil(redPrePenalty + blueFoulAwardedToRed);
+    const blueFinal = Math.ceil(bluePrePenalty + redFoulAwardedToBlue);
+
+    return {
+      redFinal, blueFinal,
+      redSuppPts, blueSuppPts,
+      redMult, blueMult,
+      redPartnerPts, bluePartnerPts,
+      ext, coopBonus,
+      redFoulBonus: blueFoulAwardedToRed,
+      blueFoulBonus: redFoulAwardedToBlue,
+      redZ3, blueZ3, totalZ3,
+    };
+  }
+
+  function fmt(n) {
+    return Number.isInteger(n) ? n.toString() : n.toFixed(2).replace(/\.?0+$/, '');
+  }
+
+  function updateUI() {
+    const s = calculateScores();
+
+    document.getElementById('red-score').textContent = s.redFinal;
+    document.getElementById('blue-score').textContent = s.blueFinal;
+
+    const winner = s.redFinal > s.blueFinal ? 'red' : s.blueFinal > s.redFinal ? 'blue' : null;
+
+    function buildBreakdown(side, suppPts, mult, partnerPts, foulBonus) {
+      const lines = [
+        `Suppression: ${fmt(state[side].suppression)} × ${fmt(mult)} = ${fmt(suppPts)}`,
+        `Partner Climb: ${partnerPts} pts`,
+        `Extinguisher: ${s.ext} pts`,
+        `Coopertition Bonus: ${s.coopBonus} pts`,
+        foulBonus > 0 ? `Foul Bonus (from opponent): +${fmt(foulBonus)} pts` : null,
+      ].filter(Boolean);
+
+      const tag = winner === side ? '<span class="winner-tag">WINNER</span>' : '';
+      return lines.map(l => `<span>${l}</span>`).join('') + tag;
+    }
+
+    document.getElementById('red-breakdown').innerHTML = buildBreakdown('red', s.redSuppPts, s.redMult, s.redPartnerPts, s.redFoulBonus);
+    document.getElementById('blue-breakdown').innerHTML = buildBreakdown('blue', s.blueSuppPts, s.blueMult, s.bluePartnerPts, s.blueFoulBonus);
+
+    document.getElementById('coop-z3-red').textContent = s.redZ3;
+    document.getElementById('coop-z3-blue').textContent = s.blueZ3;
+    document.getElementById('coop-z3-total').textContent = s.totalZ3;
+    document.getElementById('coop-bonus-pts').textContent = s.coopBonus;
+    const needed = s.totalZ3 < 4 ? `need ${4 - s.totalZ3} more robot(s) in Zone 3` : s.totalZ3 < 5 ? '5 robots → 25 pts' : s.totalZ3 < 6 ? '6 robots → 40 pts' : 'maximum bonus!';
+    document.getElementById('coop-bonus-desc').innerHTML = `Coopertition® Bonus Points<br>${needed}`;
+  }
+
+  // Slider / number sync
+  function linkSliderNumber(sliderId, numId, stateKey, side) {
+    const slider = document.getElementById(sliderId);
+    const num = document.getElementById(numId);
+    function update(val) {
+      val = Math.max(0, Math.min(500, +val || 0));
+      slider.value = val;
+      num.value = val;
+      if (side) state[side][stateKey] = val;
+      else state[stateKey] = val;
+      updateUI();
+    }
+    slider.addEventListener('input', () => update(slider.value));
+    num.addEventListener('input', () => update(num.value));
+    num.addEventListener('change', () => update(num.value));
+  }
+
+  linkSliderNumber('red-suppression-slider', 'red-suppression-num', 'suppression', 'red');
+  linkSliderNumber('blue-suppression-slider', 'blue-suppression-num', 'suppression', 'blue');
+  linkSliderNumber('ext-slider', 'ext-num', 'extinguisher', null);
+
+  // Climb button groups
+  ['red', 'blue'].forEach(side => {
+    [1, 2, 3].forEach(i => {
+      const group = document.getElementById(`${side}-robot${i}`);
+      group.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          state[side].robots[i - 1] = btn.dataset.val;
+          updateUI();
+        });
+      });
+    });
+  });
+
+  // Partner climb steppers
+  ['red', 'blue'].forEach(side => {
+    const valEl = document.getElementById(`${side}-partner-val`);
+    const ptsEl = document.getElementById(`${side}-partner-pts`);
+    document.getElementById(`${side}-partner-inc`).addEventListener('click', () => {
+      if (state[side].partnerClimbs < 2) {
+        state[side].partnerClimbs++;
+        valEl.textContent = state[side].partnerClimbs;
+        ptsEl.textContent = `${state[side].partnerClimbs * 25} pts`;
+        updateUI();
+      }
+    });
+    document.getElementById(`${side}-partner-dec`).addEventListener('click', () => {
+      if (state[side].partnerClimbs > 0) {
+        state[side].partnerClimbs--;
+        valEl.textContent = state[side].partnerClimbs;
+        ptsEl.textContent = `${state[side].partnerClimbs * 25} pts`;
+        updateUI();
+      }
+    });
+  });
+
+  // Foul inputs
+  ['red', 'blue'].forEach(side => {
+    ['minor', 'major'].forEach(type => {
+      const el = document.getElementById(`${side}-${type}-fouls`);
+      el.addEventListener('input', () => {
+        state[side][`${type}Fouls`] = Math.max(0, +el.value || 0);
+        updateUI();
+      });
+    });
+  });
+
+  updateUI();
+</script>
+
+</body>
+</html>
