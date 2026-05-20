@@ -6,8 +6,8 @@ export const PHASES = [
   { at: 1,    name: 'Rush' },
   { at: 30,   name: 'Sustained Scoring' },
   { at: 90,   name: 'Position' },
-  { at: 115,  name: 'Climb' },
-  { at: 140,  name: 'Hold' },
+  { at: 125,  name: 'Climb' },
+  { at: 150,  name: 'Hold' },
 ];
 
 export function getPhaseName(t) {
@@ -63,10 +63,10 @@ export const Z_MID = {
 export const CLIMB = {
   unit: [
     { t: 113.0, frac: 0,                 onGround: true  },
-    { t: 116.0, frac: BRACE.attachFrac,  onGround: true  }, // at attach XZ on ground, hook gripping brace
-    { t: 117.5, frac: BRACE.attachFrac,  onGround: false }, // anchor lifts the unit off ground
-    { t: 124.5, frac: Z_MID.z2,          onGround: false }, // through Z2
-    { t: 129.0, frac: Z_MID.z3,          onGround: false }, // up to Z3
+    { t: 126.0, frac: BRACE.attachFrac,  onGround: true  }, // at attach XZ on ground, hook gripping brace (+ 10s precision delay)
+    { t: 127.5, frac: BRACE.attachFrac,  onGround: false }, // anchor lifts the unit off ground
+    { t: 134.5, frac: Z_MID.z2,          onGround: false }, // through Z2
+    { t: 139.0, frac: Z_MID.z3,          onGround: false }, // up to Z3
     { t: 150.0, frac: Z_MID.z3,          onGround: false },
   ],
 };

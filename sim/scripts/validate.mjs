@@ -89,10 +89,10 @@ function interpFrac(t) {
 }
 const probes = [
   { t: 113.5, expect: 'Contact' },  // walk-to-base
-  { t: 116.5, expect: 'Contact' },  // anchor just lifting (frac small)
-  { t: 121,   expect: 'Z1' },
-  { t: 124,   expect: 'Z2' },
-  { t: 128,   expect: 'Z3' },
+  { t: 126.5, expect: 'Contact' },  // positioning delay (before lift-off at 127.5)
+  { t: 131,   expect: 'Z1' },       // +10s delay from original t=121
+  { t: 134,   expect: 'Z2' },       // +10s delay from original t=124
+  { t: 138,   expect: 'Z3' },       // +10s delay from original t=128
   { t: 140,   expect: 'Z3' },
   { t: 150,   expect: 'Z3' },
 ];
@@ -159,8 +159,8 @@ check('R1–R2 score ≥ ROBOT.size (0.50)', dist(score1, score2) >= 0.50);
 
 console.log('\n== Phases ==');
 check('phase at t=0 = Pre-rush', getPhaseName(0) === 'Pre-rush');
-check('phase at t=115 = Climb',  getPhaseName(115) === 'Climb');
-check('phase at t=140 = Hold',   getPhaseName(140) === 'Hold');
+check('phase at t=125 = Climb',  getPhaseName(125) === 'Climb');
+check('phase at t=150 = Hold',   getPhaseName(150) === 'Hold');
 
 console.log(`\n${passed} passed, ${failed} failed.`);
 process.exit(failed === 0 ? 0 : 1);

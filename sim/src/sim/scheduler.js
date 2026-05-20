@@ -19,7 +19,7 @@ import { buildStaticObstacles, steer } from './steering.js';
 // real frame dt. Climb / human-throw flows live alongside.
 
 const SCORING_END = 113.0;
-const CLIMB_WALK_END = 116.0;
+const CLIMB_WALK_END = 126.0;
 
 const LANE_FLANK_X = 0.40;
 const LANE_FLANK_Z = 0.55;
@@ -599,11 +599,11 @@ export function createScheduler(world) {
         if (t < CLIMB_WALK_END) {
           const k = (t - SCORING_END) / (CLIMB_WALK_END - SCORING_END);
           const ke = easeInOut(clamp01(k));
-          const inwardX = (allianceKey === 'red') ? -1 : +1;
+          const perp = bracePerp[allianceKey];
           const baseTargets = [
             new THREE.Vector3(baseXZ.x, 0, baseXZ.z),
-            new THREE.Vector3(baseXZ.x + inwardX * 0.50, 0, baseXZ.z - 0.30),
-            new THREE.Vector3(baseXZ.x + inwardX * 0.95, 0, baseXZ.z - 0.55),
+            new THREE.Vector3(baseXZ.x + perp.x * 0.55, 0, baseXZ.z + perp.z * 0.55),
+            new THREE.Vector3(baseXZ.x - perp.x * 0.55, 0, baseXZ.z - perp.z * 0.55),
           ];
           for (let i = 0; i < 3; i++) {
             const r = robots[allianceKey][i];
