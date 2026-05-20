@@ -1,6 +1,37 @@
 import * as THREE from 'three';
 import { EXTINGUISHER, FIELD, SUPPRESSION, COLORS, WILDFIRE } from './dims.js';
 
+function makeCountSprite() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: false,
+  }));
+  sprite.renderOrder = 10;
+  return { sprite, canvas, ctx, tex };
+}
+
+function paintCountBadge(badge, n) {
+  const { canvas, ctx, tex } = badge;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.arc(32, 32, 28, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(20,20,30,0.92)';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = COLORS.gold;
+  ctx.stroke();
+  ctx.font = 'bold 36px Segoe UI, sans-serif';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(n), 32, 34);
+  tex.needsUpdate = true;
+}
+
 export function buildExtinguisher(scene) {
   const g = new THREE.Group();
   const polyMat = new THREE.MeshStandardMaterial({
@@ -81,6 +112,12 @@ export function buildExtinguisher(scene) {
   }
   g.add(fillGroup);
 
+  // Count badge (floating number)
+  const countBadge = makeCountSprite();
+  countBadge.sprite.position.set(0, EXTINGUISHER.openingHeight + 0.3, -EXTINGUISHER.depth / 2 + 0.4);
+  countBadge.sprite.scale.set(0.4, 0.4, 1);
+  g.add(countBadge.sprite);
+
   // LED indicator strip on the front face
   const ledBase = new THREE.Mesh(
     new THREE.BoxGeometry(0.06, EXTINGUISHER.openingHeight * 0.7, 0.03),
@@ -124,7 +161,7 @@ export function buildExtinguisher(scene) {
     g.position.z + EXTINGUISHER.depth / 2
   );
 
-  return { group: g, anchor, spawnSlot, led, fillGroup };
+  return { group: g, anchor, spawnSlot, led, fillGroup, countBadge };
 }
 
 export function updateExtinguisherFill(ext, ballsContained, totalCapacity = 100) {
@@ -135,4 +172,5 @@ export function updateExtinguisherFill(ext, ballsContained, totalCapacity = 100)
   for (let i = 0; i < ext.fillGroup.children.length; i++) {
     ext.fillGroup.children[i].visible = i < visibleCount;
   }
+  paintCountBadge(ext.countBadge, ballsContained);
 }

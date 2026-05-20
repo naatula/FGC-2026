@@ -25,6 +25,37 @@ const EXTENSION_DEPTH = 1.00;             // shield is extended 1 m toward -Z
                                           // closes the gap to the front
                                           // guardrail.
 
+function makeCountSprite() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: false,
+  }));
+  sprite.renderOrder = 10;
+  return { sprite, canvas, ctx, tex };
+}
+
+function paintCountBadge(badge, n, color = '#f0b840') {
+  const { canvas, ctx, tex } = badge;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.arc(32, 32, 28, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(20,20,30,0.92)';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.font = 'bold 36px Segoe UI, sans-serif';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(n), 32, 34);
+  tex.needsUpdate = true;
+}
+
 export function buildFireShields(scene) {
   const half = FIELD.size / 2;
   const H = FIRE_SHIELD.height;
@@ -163,6 +194,12 @@ export function buildFireShields(scene) {
     floor.position.y = 0.015;
     group.add(floor);
 
+    // Count badge (floating number)
+    const countBadge = makeCountSprite();
+    countBadge.sprite.position.set(Mx, portH + 0.4, Mz);
+    countBadge.sprite.scale.set(0.4, 0.4, 1);
+    group.add(countBadge.sprite);
+
     scene.add(group);
 
     // --- Anchors (world-space) ---
@@ -195,6 +232,7 @@ export function buildFireShields(scene) {
       chuteExit: throwSpawn,
       normal: new THREE.Vector3(normX, 0, normZ),
       wallMidpoint: new THREE.Vector3(Mx, 0, Mz),
+      countBadge,
       corners: { P1: new THREE.Vector3(P1x, 0, P1z),
                  P2: new THREE.Vector3(P2x, 0, P2z),
                  C:  new THREE.Vector3(cornerX, 0, cornerZ) },
@@ -212,4 +250,8 @@ export function setGateOpen(shield, open) {
   if (shield && shield.gate && shield.gate.rotation) {
     shield.gate.rotation.x = open ? -1.2 : 0;
   }
+}
+
+export function updateFireShieldFill(shield, ballsContained, color = '#f0b840') {
+  paintCountBadge(shield.countBadge, ballsContained, color);
 }

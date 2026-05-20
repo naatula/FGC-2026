@@ -10,6 +10,7 @@ import {
   setRobotPosition, setRobotCarrying, setAnchor, setCarryCount,
 } from '../entities/Robot.js';
 import { setGateOpen } from '../field/buildFireShield.js';
+import { updateMissPileFill } from '../field/buildMissPiles.js';
 import { PARAMS } from './config.js';
 import { buildStaticObstacles, steer } from './steering.js';
 
@@ -49,7 +50,7 @@ function findSegment(frames, t) {
 
 export function createScheduler(world) {
   const {
-    robots, wildfire, suppression, extinguisher, fireShields, braces, humans,
+    robots, wildfire, suppression, extinguisher, fireShields, braces, humans, missPiles,
   } = world;
 
   const anchorRed = robots.red[0];
@@ -146,6 +147,8 @@ export function createScheduler(world) {
     suppRed: 0,
     suppBlue: 0,
     ext: 0,
+    missRed: 0,
+    missBlue: 0,
     climbZones: { red: ['—','—','—'], blue: ['—','—','—'] },
     partnerClimbs: { red: 0, blue: 0 },
     phase: 'Pre-rush',
@@ -202,6 +205,8 @@ export function createScheduler(world) {
     state.suppRed = 0;
     state.suppBlue = 0;
     state.ext = 0;
+    state.missRed = 0;
+    state.missBlue = 0;
     state.climbZones = { red: ['—','—','—'], blue: ['—','—','—'] };
     state.partnerClimbs = { red: 0, blue: 0 };
     state.phase = 'Pre-rush';
@@ -243,6 +248,10 @@ export function createScheduler(world) {
     setGateOpen(fireShields.red, false);
     setGateOpen(fireShields.blue, false);
 
+    // Reset miss pile visuals
+    updateMissPileFill(missPiles.red, 0);
+    updateMissPileFill(missPiles.blue, 0);
+
     for (let i = 0; i < wildfire.balls.length; i++) {
       const b = wildfire.balls[i];
       b.state = 'pending';
@@ -256,19 +265,51 @@ export function createScheduler(world) {
   }
   reset();
 
+  // ---- Accuracy and miss handling ----
+
+  // Off-field pile location where missed shots bounce to
+  function getMissPile(allianceKey) {
+    return missPiles[allianceKey].position.clone();
+  }
+
+  // Check if a shot hits based on accuracy percentage
+  function doesShotHit(accuracyPercent) {
+    return Math.random() * 100 < accuracyPercent;
+  }
+
   // ---- Projectile launchers ----
 
   function launchSuppArc(ball, fromXZ, allianceKey, startT) {
     const target = shotTarget(allianceKey);
     const p0 = new THREE.Vector3(fromXZ.x, 0.45, fromXZ.z);
+    const segments = [];
+    const hits = doesShotHit(PARAMS.robotAccuracy);
+
+    segments.push({
+      p0, p1: target, arcH: 2.30,
+      t0: startT, t1: startT + 1.10, visible: true,
+    });
+
+    let endT = startT + 1.10;
+    let dest = 'supp';
+
+    if (!hits) {
+      // Ball bounces from target to off-field pile
+      const missPile = getMissPile(allianceKey);
+      segments.push({
+        p0: target, p1: missPile, arcH: 0.50,
+        t0: startT + 1.10, t1: startT + 1.80, visible: true,
+      });
+      endT = startT + 1.80;
+      dest = 'missPile';
+    }
+
     ball.state = 'flying';
     ball.fly = {
-      segments: [
-        { p0, p1: target, arcH: 2.30, t0: startT, t1: startT + 1.10, visible: true },
-      ],
+      segments,
       alliance: allianceKey,
-      dest: 'supp',
-      endT: startT + 1.10,
+      dest,
+      endT,
     };
   }
 
@@ -300,16 +341,36 @@ export function createScheduler(world) {
     const ball = wildfire.balls[ballIdx];
     const shield = fireShields[allianceKey];
     const chuteExit = shield.chuteExit.clone();
+    const segments = [];
+    const hits = doesShotHit(PARAMS.humanAccuracy);
+
+    segments.push({
+      p0: chuteExit, p1: extinguisherTopTarget, arcH: 0.85,
+      t0: startT, t1: startT + 0.95, visible: true,
+    });
+
+    let endT = startT + 0.95;
+    let dest = 'shield';
+
+    if (!hits) {
+      // Ball bounces from target to off-field pile
+      const missPile = getMissPile(allianceKey);
+      segments.push({
+        p0: extinguisherTopTarget, p1: missPile, arcH: 0.50,
+        t0: startT + 0.95, t1: startT + 1.60, visible: true,
+      });
+      endT = startT + 1.60;
+      dest = 'missPile';
+    }
+
     ball.state = 'flying';
     ball.fly = {
-      segments: [
-        { p0: chuteExit, p1: extinguisherTopTarget, arcH: 0.85,
-          t0: startT, t1: startT + 0.95, visible: true },
-      ],
+      segments,
       alliance: allianceKey,
-      dest: 'shield',
-      endT: startT + 0.95,
+      dest,
+      endT,
     };
+
     if (humans && humans[allianceKey] && humans[allianceKey][0]) {
       pendingThrows.push({
         torso: humans[allianceKey][0].torso,
@@ -369,6 +430,20 @@ export function createScheduler(world) {
         } else if (f.dest === 'shield') {
           b.state = 'scored';
           state.ext++;
+        } else if (f.dest === 'missPile') {
+          // Ball lands in miss pile and is contained (like in goals/shields)
+          b.state = 'scored';
+          const missPile = missPiles[f.alliance];
+          // Position doesn't matter since 'scored' state hides it, but set it anyway
+          b.pos.set(missPile.position.x, missPile.position.y + WILDFIRE.radius, missPile.position.z);
+          // Track and update visual
+          if (f.alliance === 'red') {
+            state.missRed++;
+            updateMissPileFill(missPiles.red, state.missRed);
+          } else {
+            state.missBlue++;
+            updateMissPileFill(missPiles.blue, state.missBlue);
+          }
         } else {
           b.state = 'scored';
           if (f.alliance === 'red') state.suppRed++;
@@ -440,11 +515,8 @@ export function createScheduler(world) {
       // Acquire a ball claim if none.
       if (s.targetBallIdx === -1) {
         const lane = lanes.swim[s.alliance][s.idx];
-        const cx = (lane.xRange[0] + lane.xRange[1]) / 2;
-        const cz = (lane.zRange[0] + lane.zRange[1]) / 2;
-        const origin = new THREE.Vector3(cx, 0, cz);
         const idx = pickClosestFieldBallInZone(
-          wildfire, origin, lane.xRange, lane.zRange, claimed
+          wildfire, s.pos, lane.xRange, lane.zRange, claimed
         );
         if (idx >= 0) {
           s.targetBallIdx = idx;

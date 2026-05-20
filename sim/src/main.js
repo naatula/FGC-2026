@@ -6,6 +6,7 @@ import { buildSuppressionUnits } from './field/buildSuppressionUnit.js';
 import { buildExtinguisher } from './field/buildExtinguisher.js';
 import { buildFireShields } from './field/buildFireShield.js';
 import { buildBraces } from './field/buildBrace.js';
+import { buildMissPiles } from './field/buildMissPiles.js';
 import { makeRobot } from './entities/Robot.js';
 import { makeWildfire } from './entities/Wildfire.js';
 import { buildHumanPlayers } from './entities/HumanPlayer.js';
@@ -57,6 +58,7 @@ const extinguisher = buildExtinguisher(scene);
 const fireShields = buildFireShields(scene);
 const braces = buildBraces(scene);
 const humans = buildHumanPlayers(scene);
+const missPiles = buildMissPiles(scene);
 
 const robots = {
   red: [
@@ -75,7 +77,7 @@ robots.blue.forEach(r => scene.add(r.group));
 
 const wildfire = makeWildfire(scene, extinguisher.spawnSlot);
 
-const world = { robots, wildfire, suppression, extinguisher, fireShields, braces, humans };
+const world = { robots, wildfire, suppression, extinguisher, fireShields, braces, humans, missPiles };
 const scheduler = createScheduler(world);
 
 initRobotList();
@@ -137,6 +139,8 @@ const SLIDER_KEYS = [
   ['pickupTime', (v) => v.toFixed(2)],
   ['avoidRadius', (v) => v.toFixed(2)],
   ['avoidStrength', (v) => v.toFixed(1)],
+  ['robotAccuracy', (v) => String(v|0)],
+  ['humanAccuracy', (v) => String(v|0)],
 ];
 
 function refreshCfgUI() {

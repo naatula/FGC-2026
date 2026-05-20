@@ -13,6 +13,8 @@ export const DEFAULTS = {
   pickupTime: 0.2,         // s/ball at intake
   avoidRadius: ROBOT.size * 2.5,
   avoidStrength: 1.5,
+  robotAccuracy: 80,      // % (0-100), robot suppression-unit shot hit rate
+  humanAccuracy: 80,      // % (0-100), human throw hit rate
   roles: {
     red:  ['supp', 'shield', 'supp'],
     blue: ['supp', 'shield', 'supp'],

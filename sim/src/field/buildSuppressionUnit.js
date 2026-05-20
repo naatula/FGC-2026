@@ -17,6 +17,37 @@ import { SUPPRESSION, FIELD, COLORS, WILDFIRE } from './dims.js';
 
 const POLYCARB_OPACITY = 0.18;
 
+function makeCountSprite() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: false,
+  }));
+  sprite.renderOrder = 10;
+  return { sprite, canvas, ctx, tex };
+}
+
+function paintCountBadge(badge, n) {
+  const { canvas, ctx, tex } = badge;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.arc(32, 32, 28, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(20,20,30,0.92)';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#f0b840';
+  ctx.stroke();
+  ctx.font = 'bold 36px Segoe UI, sans-serif';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(n), 32, 34);
+  tex.needsUpdate = true;
+}
+
 function makeUnit(color, ledColor) {
   const g = new THREE.Group();
   const polyMat = new THREE.MeshStandardMaterial({
@@ -134,7 +165,13 @@ function makeUnit(color, ledColor) {
   }
   g.add(fillGroup);
 
-  return { group: g, led, fillGroup };
+  // Count badge (floating number)
+  const countBadge = makeCountSprite();
+  countBadge.sprite.position.set(0, SUPPRESSION.canopyHeight + 0.3, -SUPPRESSION.depth / 2 + 0.4);
+  countBadge.sprite.scale.set(0.4, 0.4, 1);
+  g.add(countBadge.sprite);
+
+  return { group: g, led, fillGroup, countBadge };
 }
 
 export function buildSuppressionUnits(scene) {
@@ -189,4 +226,7 @@ export function updateSuppressionFill(unit, ballsContained, totalCapacity = 180)
   for (let i = 0; i < unit.fillGroup.children.length; i++) {
     unit.fillGroup.children[i].visible = i < visibleCount;
   }
+
+  // Update count badge
+  paintCountBadge(unit.countBadge, ballsContained);
 }

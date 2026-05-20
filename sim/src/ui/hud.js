@@ -2,6 +2,8 @@
 import { computeScores } from '../sim/scoring.js';
 import { updateSuppressionFill } from '../field/buildSuppressionUnit.js';
 import { updateExtinguisherFill } from '../field/buildExtinguisher.js';
+import { updateFireShieldFill } from '../field/buildFireShield.js';
+import { COLORS } from '../field/dims.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -98,6 +100,12 @@ export function updateHud(state, t, totalSec, world) {
     updateExtinguisherFill(world.extinguisher, state.ext);
     lastHud.ext = state.ext;
   }
+
+  // Fire shield queue visuals
+  const shieldQueueRed = state.shieldQueueRed ?? 0;
+  const shieldQueueBlue = state.shieldQueueBlue ?? 0;
+  updateFireShieldFill(world.fireShields.red, shieldQueueRed, COLORS.red);
+  updateFireShieldFill(world.fireShields.blue, shieldQueueBlue, COLORS.blue);
 }
 
 export function resetHudCache() {
