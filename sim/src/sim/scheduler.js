@@ -550,6 +550,35 @@ export function createScheduler(world) {
     const role = PARAMS.roles[s.alliance][s.idx];
     const capacity = PARAMS.capacity;
 
+    if (role === 'fault') {
+      // Fault: chase the nearest ball but never collect it.
+      s.phase = 'toPickup';
+      s.carry = 0;
+      if (s.targetBallIdx === -1) {
+        const lane = lanes.swim[s.alliance][s.idx];
+        const others = gatherOthers(s);
+        const idx = pickBallNoConflict(s.pos, lane.xRange, lane.zRange, others);
+        if (idx >= 0) { s.targetBallIdx = idx; claimed.add(idx); }
+      } else {
+        const b = wildfire.balls[s.targetBallIdx];
+        if (!b || b.state !== 'field') {
+          claimed.delete(s.targetBallIdx);
+          s.targetBallIdx = -1;
+        } else {
+          const reached = driveToward(s, b.pos.x, b.pos.z, dt);
+          if (reached) {
+            claimed.delete(s.targetBallIdx);
+            s.targetBallIdx = -1;
+          }
+        }
+      }
+      setRobotPosition(robot, s.pos.x, 0, s.pos.z);
+      setCarryCount(robot, 0);
+      setRobotCarrying(robot, false);
+      pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, -1);
+      return;
+    }
+
     if (s.phase === 'toPickup') {
       // Acquire a ball claim if none.
       if (s.targetBallIdx === -1) {
