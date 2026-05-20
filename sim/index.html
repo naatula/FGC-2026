@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FGC 2026 – Igniting Innovation: Match Simulation</title>
+  <style>
+    :root {
+      --bg: #0a0a12;
+      --panel: rgba(20, 20, 32, 0.85);
+      --border: #2e2e48;
+      --text: #e8e8f0;
+      --muted: #888899;
+      --red: #e8394a;
+      --red-dim: rgba(232, 57, 74, 0.18);
+      --blue: #3a7fe8;
+      --blue-dim: rgba(58, 127, 232, 0.18);
+      --gold: #f0b840;
+      --gold-dim: rgba(240, 184, 64, 0.18);
+      --green: #40c080;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    #canvas-root { position: absolute; inset: 0; }
+
+    /* Top banner */
+    #banner {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 14px;
+      align-items: center;
+      min-width: 720px;
+      pointer-events: none;
+    }
+    .score {
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 18px 12px;
+      min-width: 260px;
+    }
+    .score.red { border-color: var(--red); background: linear-gradient(180deg, var(--red-dim), var(--panel)); }
+    .score.blue { border-color: var(--blue); background: linear-gradient(180deg, var(--blue-dim), var(--panel)); }
+    .score .label {
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .score .value {
+      font-size: 2.6rem;
+      font-weight: 800;
+      line-height: 1;
+      margin: 2px 0 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .score.red .value { color: var(--red); }
+    .score.blue .value { color: var(--blue); }
+    .score .breakdown {
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.45;
+      margin-top: 4px;
+    }
+    .score .breakdown span { color: var(--text); font-weight: 600; }
+
+    #timer-wrap {
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 22px;
+      text-align: center;
+      min-width: 180px;
+    }
+    #timer-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    #timer {
+      font-size: 2.4rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      margin-top: 2px;
+    }
+    #phase {
+      font-size: 0.72rem;
+      color: var(--gold);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      min-height: 14px;
+    }
+    #coop {
+      margin-top: 6px;
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      background: #1a1a24;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    #coop.active {
+      background: var(--gold);
+      color: #111;
+      border-color: var(--gold);
+    }
+
+    /* Side panel */
+    #side {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      width: 240px;
+      font-size: 0.78rem;
+      pointer-events: none;
+    }
+    #side h3 {
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    #side .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.05);
+    }
+    #side .row:last-child { border-bottom: none; }
+    #side .robot-dot {
+      display: inline-block; width: 9px; height: 9px;
+      border-radius: 50%; margin-right: 6px; vertical-align: middle;
+    }
+    #side .robot-dot.r { background: var(--red); }
+    #side .robot-dot.b { background: var(--blue); }
+    #side .zone-tag {
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 8px;
+      font-size: 0.7rem;
+      background: #2a2a3a;
+      color: var(--muted);
+    }
+    #side .zone-tag.contact { background: #3a3a55; color: #c8c8d8; }
+    #side .zone-tag.z1 { background: #364b8a; color: #cfe; }
+    #side .zone-tag.z2 { background: #46519a; color: #def; }
+    #side .zone-tag.z3 { background: var(--gold); color: #111; }
+    #side hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
+
+    /* Bottom controls */
+    #controls {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 14px;
+    }
+    #controls button, #controls select {
+      background: #1a1a24;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #controls button:hover { border-color: var(--gold); }
+    #controls label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #speed-val {
+      color: var(--text);
+      font-weight: 600;
+      width: 36px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    #controls input[type=range] {
+      width: 110px;
+    }
+
+    /* Configurator panel */
+    #config-panel {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      width: 290px;
+      font-size: 0.78rem;
+      display: none;
+    }
+    #config-panel.open { display: block; }
+    #config-panel h3 {
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    #config-panel .cfg-row {
+      display: grid;
+      grid-template-columns: 1fr 110px 44px;
+      gap: 6px;
+      align-items: center;
+      padding: 3px 0;
+    }
+    #config-panel .cfg-row label {
+      color: var(--text);
+      font-size: 0.78rem;
+    }
+    #config-panel input[type=range] {
+      width: 100%;
+    }
+    #config-panel .cfg-val {
+      text-align: right;
+      color: var(--gold);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    #config-panel .role-grid {
+      display: grid;
+      grid-template-columns: 32px 1fr 32px 1fr;
+      gap: 4px 6px;
+      align-items: center;
+      margin-top: 4px;
+    }
+    #config-panel .role-grid .rk {
+      color: var(--muted);
+      font-weight: 700;
+      text-align: right;
+    }
+    #config-panel select {
+      background: #1a1a24;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 4px;
+      font-family: inherit;
+      font-size: 0.74rem;
+    }
+    #config-panel hr {
+      border: 0; border-top: 1px solid var(--border);
+      margin: 8px 0;
+    }
+    #config-panel .cfg-reset {
+      margin-top: 8px;
+      width: 100%;
+      background: #1a1a24;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #config-panel .cfg-reset:hover { border-color: var(--gold); }
+
+    /* Legend / footer */
+    #legend {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      max-width: 260px;
+      line-height: 1.5;
+    }
+    #legend strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div id="canvas-root"></div>
+
+  <div id="banner">
+    <div class="score red">
+      <div class="label">Red Regional</div>
+      <div class="value" id="red-score">0</div>
+      <div class="breakdown" id="red-breakdown">
+        Suppression: <span id="red-supp">0</span> &nbsp; ×<span id="red-mult">1.00</span><br/>
+        Partner climbs: <span id="red-partner">0</span> &nbsp; Coop: <span id="red-coop">0</span>
+      </div>
+    </div>
+
+    <div id="timer-wrap">
+      <div id="timer-label">Match Timer</div>
+      <div id="timer">2:30</div>
+      <div id="phase">Pre-match</div>
+      <div id="coop">Coopertition: —</div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">
+        Extinguisher: <span id="ext-count" style="color:var(--text);font-weight:700;">0</span>
+        &nbsp; Queue: <span style="color:var(--red);font-weight:700;" id="queue-red">0</span>
+        / <span style="color:var(--blue);font-weight:700;" id="queue-blue">0</span>
+      </div>
+    </div>
+
+    <div class="score blue">
+      <div class="label">Blue Regional</div>
+      <div class="value" id="blue-score">0</div>
+      <div class="breakdown" id="blue-breakdown">
+        Suppression: <span id="blue-supp">0</span> &nbsp; ×<span id="blue-mult">1.00</span><br/>
+        Partner climbs: <span id="blue-partner">0</span> &nbsp; Coop: <span id="blue-coop">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="side">
+    <h3>Robot Climb Status</h3>
+    <div id="robot-list"></div>
+    <hr/>
+    <div class="row"><span>Red multiplier</span><span id="red-mult-2">×1.00</span></div>
+    <div class="row"><span>Blue multiplier</span><span id="blue-mult-2">×1.00</span></div>
+    <div class="row"><span>Robots in Zone 3</span><span id="z3-count">0 / 6</span></div>
+  </div>
+
+  <div id="controls">
+    <button id="btn-play">▶ Play</button>
+    <button id="btn-restart">⟲ Restart</button>
+    <label>Speed
+      <input type="range" id="speed" min="0.5" max="10" step="0.5" value="1" />
+      <span id="speed-val">1.0×</span>
+    </label>
+    <label>Camera
+      <select id="cam">
+        <option value="orbit">Free Orbit</option>
+        <option value="red">Red Station</option>
+        <option value="blue">Blue Station</option>
+        <option value="top">Overhead</option>
+      </select>
+    </label>
+    <button id="btn-config">⚙ Config</button>
+  </div>
+
+  <div id="config-panel">
+    <h3>Parameters</h3>
+    <div class="cfg-row">
+      <label>Drive speed</label>
+      <input type="range" id="cfg-driveSpeed" min="0.2" max="4" step="0.1" />
+      <span class="cfg-val" id="cfg-driveSpeed-v"></span>
+    </div>
+    <div class="cfg-row">
+      <label>Capacity</label>
+      <input type="range" id="cfg-capacity" min="1" max="20" step="1" />
+      <span class="cfg-val" id="cfg-capacity-v"></span>
+    </div>
+    <div class="cfg-row">
+      <label>Shoot interval (s)</label>
+      <input type="range" id="cfg-shootInterval" min="0.2" max="6" step="0.1" />
+      <span class="cfg-val" id="cfg-shootInterval-v"></span>
+    </div>
+    <div class="cfg-row">
+      <label>Transfer interval (s)</label>
+      <input type="range" id="cfg-transferInterval" min="0.1" max="3" step="0.1" />
+      <span class="cfg-val" id="cfg-transferInterval-v"></span>
+    </div>
+    <div class="cfg-row">
+      <label>Human interval (s)</label>
+      <input type="range" id="cfg-humanInterval" min="0.5" max="8" step="0.1" />
+      <span class="cfg-val" id="cfg-humanInterval-v"></span>
+    </div>
+    <div class="cfg-row">
+      <label>Pickup time (s)</label>
+      <input type="range" id="cfg-pickupTime" min="0" max="2" step="0.05" />
+      <span class="cfg-val" id="cfg-pickupTime-v"></span>
+    </div>
+    <div class="cfg-row">
+      <label>Avoid radius (m)</label>
+      <input type="range" id="cfg-avoidRadius" min="0.5" max="3" step="0.1" />
+      <span class="cfg-val" id="cfg-avoidRadius-v"></span>
+    </div>
+    <div class="cfg-row">
+      <label>Avoid strength</label>
+      <input type="range" id="cfg-avoidStrength" min="0" max="4" step="0.1" />
+      <span class="cfg-val" id="cfg-avoidStrength-v"></span>
+    </div>
+    <hr/>
+    <div style="color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;">Roles</div>
+    <div class="role-grid">
+      <span class="rk">R1</span>
+      <select id="role-red-0"><option value="supp">supp</option><option value="shield">shield</option></select>
+      <span class="rk">B1</span>
+      <select id="role-blue-0"><option value="supp">supp</option><option value="shield">shield</option></select>
+      <span class="rk">R2</span>
+      <select id="role-red-1"><option value="supp">supp</option><option value="shield">shield</option></select>
+      <span class="rk">B2</span>
+      <select id="role-blue-1"><option value="supp">supp</option><option value="shield">shield</option></select>
+      <span class="rk">R3</span>
+      <select id="role-red-2"><option value="supp">supp</option><option value="shield">shield</option></select>
+      <span class="rk">B3</span>
+      <select id="role-blue-2"><option value="supp">supp</option><option value="shield">shield</option></select>
+    </div>
+    <button id="cfg-reset" class="cfg-reset">Reset to defaults</button>
+  </div>
+
+  <div id="legend">
+    <strong>FGC 2026 — Igniting Innovation</strong><br/>
+    Six robots, 500 wildfire, 2:30 match. Click <em>Play</em> to run the
+    optimal-strategy scenario (rush → sustained → climb → coopertition).
+    Drag to orbit, scroll to zoom.
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
