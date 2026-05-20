@@ -14,7 +14,9 @@ const CONTACT_RB = ROBOT_R + BALL_R;  // robot-ball contact distance = 0.30 m
 const CONTACT_BB = BALL_R * 2;        // ball-ball contact distance = 0.10 m
 
 const _half = FIELD.size / 2;
-const _sX   = _half * 0.55;
+// Suppression unit AABB center X: inner side is flush with the Extinguisher's
+// outer wall (no gap), so AABB-center = EXTINGUISHER.width/2 + backWidth/2.
+const _sX   = EXTINGUISHER.width / 2 + SUPPRESSION.width / 2;
 
 // Fire shield geometry constants
 const _shieldWallLen = 0.80;
@@ -22,6 +24,11 @@ const _shieldAngleRad = 30 * Math.PI / 180;
 const _shieldOffX = _shieldWallLen * Math.cos(_shieldAngleRad);  // ≈ 0.693
 const _shieldOffZ = _shieldWallLen * Math.sin(_shieldAngleRad);  // = 0.40
 const _shieldExtension = 1.00;
+
+// Port barrier constants (invisible barrier at fire shield port opening)
+const _portOpeningW = _shieldWallLen * 0.60;  // 60% of wall width (center 60%)
+const _portOpeningH = FIRE_SHIELD.portHeight; // 0.25 m
+const _portBarrierThickness = 0.05;           // thin collision plane
 
 // Physical AABBs of obstacles that rolling balls should bounce off.
 const OBSTACLES = [
@@ -44,6 +51,35 @@ const OBSTACLES = [
   },
 ];
 
+// Check collision with rotated port barrier. Barrier is a thin rectangular plane
+// that blocks balls from freely rolling into the fire shield port.
+function bounceFromPortBarrier(b, barX, barZ, barAngle, openingW, openingH) {
+  // Transform ball position to local barrier coordinates
+  const cosA = Math.cos(barAngle);
+  const sinA = Math.sin(barAngle);
+  const localX = (b.pos.x - barX) * cosA - (b.pos.z - barZ) * (-sinA);
+  const localZ = (b.pos.x - barX) * (-sinA) + (b.pos.z - barZ) * cosA;
+
+  // Check if ball is within the port opening area (with thickness)
+  if (Math.abs(localX) <= openingW / 2 &&
+      Math.abs(localZ) <= _portBarrierThickness / 2) {
+    // Ball center is in the barrier volume — bounce it back
+    const worldNx = -sinA;  // normal pointing out of the barrier
+    const worldNz = cosA;
+    const dist = Math.abs(localZ);
+    const pen = _portBarrierThickness / 2 - dist;
+    if (pen > 0) {
+      b.pos.x += worldNx * (BALL_R - dist);
+      b.pos.z += worldNz * (BALL_R - dist);
+      const vn = b.vel.x * worldNx + b.vel.z * worldNz;
+      if (vn < 0) {
+        b.vel.x -= (1 + OBS_RESTITUTION) * vn * worldNx;
+        b.vel.z -= (1 + OBS_RESTITUTION) * vn * worldNz;
+      }
+    }
+  }
+}
+
 function bounceFromObstacles(b) {
   for (const ab of OBSTACLES) {
     const cx = Math.max(ab.minX, Math.min(b.pos.x, ab.maxX));
@@ -61,6 +97,34 @@ function bounceFromObstacles(b) {
       b.vel.x -= (1 + OBS_RESTITUTION) * vn * nx;
       b.vel.z -= (1 + OBS_RESTITUTION) * vn * nz;
     }
+  }
+
+  // Port barriers (invisible collision planes at fire shield port openings)
+  // Red shield port
+  {
+    const P1x = _half - _shieldOffX;
+    const P1z = _half - _shieldExtension;
+    const P2x = _half;
+    const P2z = _half - _shieldExtension - _shieldOffZ;
+    const Mx = (P1x + P2x) / 2;
+    const Mz = (P1z + P2z) / 2;
+    const dx = P2x - P1x;
+    const dz = P2z - P1z;
+    const barAngle = Math.atan2(-dz, dx);
+    bounceFromPortBarrier(b, Mx, Mz, barAngle, _portOpeningW, _portOpeningH);
+  }
+  // Blue shield port
+  {
+    const P1x = -_half + _shieldOffX;
+    const P1z = _half - _shieldExtension;
+    const P2x = -_half;
+    const P2z = _half - _shieldExtension - _shieldOffZ;
+    const Mx = (P1x + P2x) / 2;
+    const Mz = (P1z + P2z) / 2;
+    const dx = P2x - P1x;
+    const dz = P2z - P1z;
+    const barAngle = Math.atan2(-dz, dx);
+    bounceFromPortBarrier(b, Mx, Mz, barAngle, _portOpeningW, _portOpeningH);
   }
 }
 

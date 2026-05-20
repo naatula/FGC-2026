@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BRACE, FIELD, EXTINGUISHER, COLORS } from './dims.js';
+import { BRACE, FIELD, EXTINGUISHER, SUPPRESSION, COLORS } from './dims.js';
 
 // A brace is a cylinder rising from a front corner (low end ~24 cm) up to
 // the top outer corner of the Extinguisher (high end ~197 cm).
@@ -109,23 +109,22 @@ export function buildBraces(scene) {
 
   const extTopY = EXTINGUISHER.height; // ~1.97 m, matches BRACE.highEnd
   const extHalfW = EXTINGUISHER.width / 2;
-  const extZ = -FIELD.size / 2 + EXTINGUISHER.depth / 2;
 
-  // Lower end: in the central gap between the two (extended) fire shields,
-  // along the +X/-X line passing through the center of the respective
-  // suppression unit. The suppression units sit at ±half*0.55 (see
-  // buildSuppressionUnits).
+  // Lower end: in the central gap between the two (extended) fire shields
   const suppCenterX = half * 0.55;
   const lowZ = half - 0.50;  // sits between the two fire shields
 
+  // Upper end: at the front wall of the suppression units (not back wall of extinguisher)
+  const suppFrontZ = -half + SUPPRESSION.depth;  // Front face Z of suppressors
+
   const redLow = new THREE.Vector3(suppCenterX, BRACE.lowEnd, lowZ);
   const redHigh = new THREE.Vector3(
-    extHalfW, extTopY, extZ - EXTINGUISHER.depth / 2 + 0.03
+    extHalfW, extTopY, suppFrontZ
   );
 
   const blueLow = new THREE.Vector3(-suppCenterX, BRACE.lowEnd, lowZ);
   const blueHigh = new THREE.Vector3(
-    -extHalfW, extTopY, extZ - EXTINGUISHER.depth / 2 + 0.03
+    -extHalfW, extTopY, suppFrontZ
   );
 
   const red = makeBrace(COLORS.red, redLow, redHigh);

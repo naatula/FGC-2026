@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  WILDFIRE, COLORS, FIELD, ROBOT, SUPPRESSION, EXTINGUISHER,
+  WILDFIRE, COLORS, FIELD, ROBOT, SUPPRESSION, EXTINGUISHER, FIRE_SHIELD,
 } from '../field/dims.js';
 
 // A pool of `count` wildfire balls implemented as an InstancedMesh.
@@ -18,7 +18,14 @@ const DUMMY = new THREE.Object3D();
 // must NOT come to rest — robots can't fetch balls trapped in these zones.
 const _half = FIELD.size / 2;
 const _inflate = ROBOT.size / 2 + 0.10;
-const _sUnitX = _half * 0.55;
+// Suppression unit AABB center X (inner side flush with Extinguisher)
+const _sUnitX = EXTINGUISHER.width / 2 + SUPPRESSION.width / 2;
+// Fire shield geometry constants for exclusion zones
+const _shieldWallLen = 0.80;
+const _shieldAngleRad = 30 * Math.PI / 180;
+const _shieldOffX = _shieldWallLen * Math.cos(_shieldAngleRad);  // ≈ 0.693
+const _shieldOffZ = _shieldWallLen * Math.sin(_shieldAngleRad);  // ≈ 0.40
+const _shieldExtension = 1.00;
 const _exclusions = [
   {
     minX: _sUnitX - SUPPRESSION.width / 2 - _inflate,
@@ -38,16 +45,18 @@ const _exclusions = [
     minZ: -_half - _inflate,
     maxZ: -_half + EXTINGUISHER.depth + _inflate,
   },
+  // Red fire shield (top-right corner at +X, +Z)
   {
-    minX: _half - 0.80 * Math.cos(Math.PI / 6) - _inflate,
+    minX: _half - _shieldOffX - _inflate,
     maxX: _half + _inflate,
-    minZ: _half - 0.80 * Math.sin(Math.PI / 6) - _inflate,
+    minZ: _half - _shieldExtension - _shieldOffZ - _inflate,
     maxZ: _half + _inflate,
   },
+  // Blue fire shield (top-left corner at -X, +Z)
   {
     minX: -_half - _inflate,
-    maxX: -_half + 0.80 * Math.cos(Math.PI / 6) + _inflate,
-    minZ: _half - 0.80 * Math.sin(Math.PI / 6) - _inflate,
+    maxX: -_half + _shieldOffX + _inflate,
+    minZ: _half - _shieldExtension - _shieldOffZ - _inflate,
     maxZ: _half + _inflate,
   },
 ];

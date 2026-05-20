@@ -64,21 +64,14 @@ export function buildExtinguisher(scene) {
   sideR.position.x = EXTINGUISHER.width / 2;
   g.add(sideL, sideR);
 
-  // Ledge (extends forward from opening)
-  const ledge = new THREE.Mesh(
-    new THREE.BoxGeometry(EXTINGUISHER.width, 0.03, EXTINGUISHER.ledge),
+  // Front wall: floor to ledge-bottom height (= SUPPRESSION.canopyHeight),
+  // placed at the actual front face of the extinguisher.
+  const front = new THREE.Mesh(
+    new THREE.BoxGeometry(EXTINGUISHER.width, SUPPRESSION.canopyHeight, 0.03),
     polyMat
   );
-  ledge.position.set(0, EXTINGUISHER.openingHeight, EXTINGUISHER.ledge / 2);
-  g.add(ledge);
-
-  // Top "lid" above ledge
-  const top = new THREE.Mesh(
-    new THREE.BoxGeometry(EXTINGUISHER.width, 0.03, EXTINGUISHER.depth),
-    polyMat
-  );
-  top.position.set(0, EXTINGUISHER.height - 0.015, 0);
-  g.add(top);
+  front.position.set(0, SUPPRESSION.canopyHeight / 2, EXTINGUISHER.depth / 2);
+  g.add(front);
 
   // Base slot indicator (where balls spawn) — a subtle dark band
   const slot = new THREE.Mesh(
@@ -94,7 +87,7 @@ export function buildExtinguisher(scene) {
   const ballMat = new THREE.MeshStandardMaterial({
     color: COLORS.wildfire, roughness: 0.65
   });
-  const cols = 14, rows = 4;
+  const cols = 7, rows = 4;
   for (let i = 0; i < 120; i++) {
     const m = new THREE.Mesh(ballGeo, ballMat);
     const layer = Math.floor(i / (cols * rows));
@@ -103,8 +96,7 @@ export function buildExtinguisher(scene) {
     const c = idx % cols;
     m.position.set(
       (c - (cols - 1) / 2) * (WILDFIRE.radius * 2.05),
-      EXTINGUISHER.openingHeight + WILDFIRE.radius +
-        layer * (WILDFIRE.radius * 1.7),
+      WILDFIRE.radius + layer * (WILDFIRE.radius * 1.7),
       (r - (rows - 1) / 2) * (WILDFIRE.radius * 1.6) - EXTINGUISHER.depth * 0.2
     );
     m.visible = false;

@@ -1,19 +1,25 @@
 import * as THREE from 'three';
-import { SUPPRESSION, FIELD, COLORS, WILDFIRE } from './dims.js';
+import { SUPPRESSION, FIELD, EXTINGUISHER, COLORS, WILDFIRE } from './dims.js';
 
-// Suppression Units sit at the back edge of the field, flanking the
-// Extinguisher. Red is at +X side, blue at -X side, both at -Z (back).
+// Suppression Units flank the Extinguisher at the back of the field. Footprint
+// is an asymmetric trapezoid (plan view, red on +X):
 //
-// Layout: back wall of unit hugs the back guardrail; the unit faces +Z.
+//     back guardrail (z = -half)
+//     +------------------+
+//     |                 /
+//     | (inner flush  /  <- outer side, 60° from front edge
+//     |  with Ext.)  /
+//     +-------------+
+//        90 cm front face (the "main edge")
 //
-// We model:
-//   - translucent backboard
-//   - two side walls
-//   - canopy overhang at top
-//   - vertical LED indicator showing wildfire fill level
+// The inner side sits at world x = ±EXTINGUISHER.width/2 (no gap with the
+// Extinguisher). For the blue unit the geometry is mirrored via scale.x = -1.
 //
-// Returns { group, redLed, blueLed, redAnchor, blueAnchor } where the anchors
-// are world-space points where a robot "drops a ball" to score.
+// Local coordinate frame (per unit):
+//   origin  = center of AABB
+//   +x      = outward (away from extinguisher)
+//   +z      = forward (toward field center)
+//   so inner side is at x = -backWidth/2, back side at z = -depth/2.
 
 const POLYCARB_OPACITY = 0.18;
 
@@ -56,6 +62,7 @@ function makeUnit(color, ledColor) {
     opacity: POLYCARB_OPACITY,
     roughness: 0.1,
     metalness: 0.0,
+    side: THREE.DoubleSide,
   });
   const tintMat = new THREE.MeshStandardMaterial({
     color,
@@ -64,62 +71,85 @@ function makeUnit(color, ledColor) {
     roughness: 0.2,
     emissive: color,
     emissiveIntensity: 0.15,
+    side: THREE.DoubleSide,
   });
 
-  // Backboard (full height)
+  const fw = SUPPRESSION.frontWidth;
+  const bw = SUPPRESSION.backWidth;
+  const d  = SUPPRESSION.depth;
+  const h  = SUPPRESSION.height;
+  const ch = SUPPRESSION.canopyHeight;
+  const ceil = SUPPRESSION.ceilingHeight;
+  const co = SUPPRESSION.canopyOverhang;
+
+  // Front face X span (local): from -bw/2 to -bw/2 + fw
+  const frontMinX = -bw / 2;
+  const frontMaxX = -bw / 2 + fw;
+  const frontCenterX = (frontMinX + frontMaxX) / 2;
+
+  // Back wall (tinted backboard): full back-edge width
   const back = new THREE.Mesh(
-    new THREE.BoxGeometry(SUPPRESSION.width, SUPPRESSION.height, 0.03),
+    new THREE.BoxGeometry(bw, h, 0.03),
     tintMat
   );
-  back.position.set(0, SUPPRESSION.height / 2, -SUPPRESSION.depth / 2);
+  back.position.set(0, h / 2, -d / 2);
   g.add(back);
 
-  // Two side walls
-  const sideGeo = new THREE.BoxGeometry(0.03, SUPPRESSION.height, SUPPRESSION.depth);
-  const sideL = new THREE.Mesh(sideGeo, polyMat);
-  sideL.position.set(-SUPPRESSION.width / 2, SUPPRESSION.height / 2, 0);
-  const sideR = sideL.clone();
-  sideR.position.x = SUPPRESSION.width / 2;
-  g.add(sideL, sideR);
+  // Inner side wall (flush with Extinguisher): straight, from back to front
+  const innerSide = new THREE.Mesh(
+    new THREE.BoxGeometry(0.03, h, d),
+    polyMat
+  );
+  innerSide.position.set(-bw / 2, h / 2, 0);
+  g.add(innerSide);
 
-  // Canopy: a forward-projecting awning at the top, covering the opening on
-  // the front face. Per manual §2.2 the canopy bottom edge sits at 165 cm
-  // and projects 40 cm beyond the front vertical surface. The unit's top is
-  // OPEN (no lid) — balls are tossed in from above past the canopy edge.
-  const canopy = new THREE.Mesh(
-    new THREE.BoxGeometry(
-      SUPPRESSION.width + 0.05,
-      0.04,
-      SUPPRESSION.canopyOverhang
-    ),
-    tintMat
+  // Outer angled side wall: runs from front-outer-corner to back-outer-corner.
+  // Height matches the front wall (ch) so the ledge sits flush on top of both.
+  const outerLen = Math.hypot(SUPPRESSION.backOffset, d);
+  const outerSide = new THREE.Mesh(
+    new THREE.BoxGeometry(outerLen, ch, 0.03),
+    polyMat
   );
-  canopy.position.set(
-    0,
-    SUPPRESSION.canopyHeight,
-    SUPPRESSION.depth / 2 + SUPPRESSION.canopyOverhang / 2
+  // center of the segment between (frontMaxX, d/2) and (bw/2, -d/2)
+  outerSide.position.set(
+    (frontMaxX + bw / 2) / 2,
+    ch / 2,
+    0
   );
-  g.add(canopy);
+  // angle the segment makes with +x axis (rotating in XZ-plane around Y)
+  // direction from (frontMaxX, d/2) to (bw/2, -d/2) is (backOffset, -d)
+  // rotation about Y: positive Y-rotation rotates +x toward -z, which matches
+  outerSide.rotation.y = Math.atan2(d, SUPPRESSION.backOffset);
+  g.add(outerSide);
 
-  // Two slim risers that visually attach the canopy to the back-top of the
-  // unit, so the awning reads as a roof rather than a floating slab.
-  const riserGeo = new THREE.BoxGeometry(
-    0.04, SUPPRESSION.height - SUPPRESSION.canopyHeight, 0.04
+  // Front face (the "main edge"): a polycarb wall with the door. Reaches up
+  // only to where the triangular ledge begins (LEDGE.H_BOT) so the ledge
+  // wraps cleanly above without intersecting this wall.
+  const front = new THREE.Mesh(
+    new THREE.BoxGeometry(fw, ch, 0.03),
+    polyMat
   );
-  const riserY = (SUPPRESSION.height + SUPPRESSION.canopyHeight) / 2;
-  const riserL = new THREE.Mesh(riserGeo, polyMat);
-  riserL.position.set(-SUPPRESSION.width / 2 + 0.04, riserY, SUPPRESSION.depth / 2);
-  const riserR = riserL.clone();
-  riserR.position.x = SUPPRESSION.width / 2 - 0.04;
-  g.add(riserL, riserR);
+  front.position.set(frontCenterX, ch / 2, d / 2);
+  g.add(front);
+
+  // Roof: flat trapezoidal cap at y = ceil (ceiling height) covering the unit's full footprint
+  const roofGeo = new THREE.BufferGeometry();
+  roofGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+    frontMinX, ceil,  d / 2,   // front-inner
+    frontMaxX, ceil,  d / 2,   // front-outer
+    bw / 2,    ceil, -d / 2,   // back-outer
+   -bw / 2,    ceil, -d / 2,   // back-inner
+  ], 3));
+  roofGeo.setIndex([0, 1, 2,  0, 2, 3]);
+  roofGeo.computeVertexNormals();
+  g.add(new THREE.Mesh(roofGeo, polyMat));
 
   // LED column inside the back wall — vertical bar that grows in fill
-  // We render it as two stacked boxes: dim base + bright fill that scales.
   const ledBase = new THREE.Mesh(
-    new THREE.BoxGeometry(0.06, SUPPRESSION.canopyHeight, 0.03),
+    new THREE.BoxGeometry(0.06, ch, 0.03),
     new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 1 })
   );
-  ledBase.position.set(0, SUPPRESSION.canopyHeight / 2, -SUPPRESSION.depth / 2 + 0.04);
+  ledBase.position.set(0, ch / 2, -d / 2 + 0.04);
   g.add(ledBase);
 
   const ledFillGeo = new THREE.BoxGeometry(0.05, 1, 0.03);
@@ -133,18 +163,17 @@ function makeUnit(color, ledColor) {
     })
   );
   led.scale.y = 0.001;
-  led.position.set(0, 0, -SUPPRESSION.depth / 2 + 0.05);
+  led.position.set(0, 0, -d / 2 + 0.05);
   g.add(led);
 
-  // Containment "fill" — a stack of small spheres rising visually as balls are
-  // contained. We pre-make many spheres and reveal them progressively.
+  // Containment "fill" — pre-make spheres in a stack inside the trapezoid.
   const fillGroup = new THREE.Group();
   const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 10, 8);
   const ballMat = new THREE.MeshStandardMaterial({
-    color: COLORS.wildfire, roughness: 0.65
+    color: COLORS.wildfire, roughness: 0.65,
   });
-  const cols = 9, rows = 5;
-  const layerHeight = SUPPRESSION.canopyHeight - 0.2;
+  const cols = 7, rows = 4;
+  const layerHeight = ch - 0.2;
   for (let i = 0; i < 200; i++) {
     const m = new THREE.Mesh(ballGeo, ballMat);
     const layer = Math.floor(i / (cols * rows));
@@ -152,12 +181,12 @@ function makeUnit(color, ledColor) {
     const r = Math.floor(idxInLayer / cols);
     const c = idxInLayer % cols;
     const jitter = (Math.random() - 0.5) * 0.01;
+    // pile centered under the front opening for visibility
     m.position.set(
-      (c - (cols - 1) / 2) * (WILDFIRE.radius * 2.05) + jitter,
+      frontCenterX + (c - (cols - 1) / 2) * (WILDFIRE.radius * 2.05) + jitter,
       WILDFIRE.radius + layer * (WILDFIRE.radius * 1.7) +
         (r * 0.02) + jitter,
-      (r - (rows - 1) / 2) * (WILDFIRE.radius * 1.6) + jitter -
-        SUPPRESSION.depth * 0.1
+      (r - (rows - 1) / 2) * (WILDFIRE.radius * 1.6) + jitter
     );
     if (m.position.y > layerHeight) break;
     m.visible = false;
@@ -165,68 +194,63 @@ function makeUnit(color, ledColor) {
   }
   g.add(fillGroup);
 
-  // Count badge (floating number)
+  // Count badge (floating number above the canopy)
   const countBadge = makeCountSprite();
-  countBadge.sprite.position.set(0, SUPPRESSION.canopyHeight + 0.3, -SUPPRESSION.depth / 2 + 0.4);
+  countBadge.sprite.position.set(frontCenterX, ch + 0.3, -d / 2 + 0.4);
   countBadge.sprite.scale.set(0.4, 0.4, 1);
   g.add(countBadge.sprite);
 
-  return { group: g, led, fillGroup, countBadge };
+  return { group: g, led, fillGroup, countBadge, frontCenterX };
 }
 
 export function buildSuppressionUnits(scene) {
   const half = FIELD.size / 2;
+  const bw = SUPPRESSION.backWidth;
+  const d  = SUPPRESSION.depth;
+
+  // Inner side (flush with Extinguisher) sits at x = ±EXTINGUISHER.width/2.
+  // The unit's local origin is at its AABB center → world X = innerX + bw/2.
+  const innerX = EXTINGUISHER.width / 2;
+  const aabbCenterX = innerX + bw / 2;
+  const groupZ = -half + d / 2;
 
   const red = makeUnit(COLORS.red, COLORS.red);
-  // Red unit: at the +X side of the back wall
-  red.group.position.set(
-    half * 0.55,
-    0,
-    -half + SUPPRESSION.depth / 2
-  );
+  red.group.position.set(aabbCenterX, 0, groupZ);
   scene.add(red.group);
 
   const blue = makeUnit(COLORS.blue, COLORS.blue);
-  blue.group.position.set(
-    -half * 0.55,
-    0,
-    -half + SUPPRESSION.depth / 2
-  );
+  // Mirror the local +x = outward convention by flipping the group
+  blue.group.position.set(-aabbCenterX, 0, groupZ);
+  blue.group.scale.x = -1;
   scene.add(blue.group);
 
   // Anchor point: idx 0 stands here, clear of the canopy's forward overhang
   // so it has a free upward shot into the open top of the unit. Other lanes
   // queue behind via LANE_DZ in the scheduler.
-  const forwardClear = SUPPRESSION.canopyOverhang + 0.20; // past canopy edge
-  const redAnchor = new THREE.Vector3(
-    red.group.position.x,
-    0,
-    red.group.position.z + SUPPRESSION.depth / 2 + forwardClear
-  );
-  const blueAnchor = new THREE.Vector3(
-    blue.group.position.x,
-    0,
-    blue.group.position.z + SUPPRESSION.depth / 2 + forwardClear
-  );
+  const forwardClear = SUPPRESSION.canopyOverhang + 0.20;
+  // World X of the front face center for red = aabbCenterX + frontCenterX(local)
+  const redFrontX = red.group.position.x + red.frontCenterX;
+  const blueFrontX = blue.group.position.x - blue.frontCenterX; // mirrored
+  const anchorZ = groupZ + d / 2 + forwardClear;
+
+  const redAnchor = new THREE.Vector3(redFrontX, 0, anchorZ);
+  const blueAnchor = new THREE.Vector3(blueFrontX, 0, anchorZ);
 
   return {
-    red: { ...red, anchor: redAnchor },
+    red:  { ...red,  anchor: redAnchor  },
     blue: { ...blue, anchor: blueAnchor },
   };
 }
 
 export function updateSuppressionFill(unit, ballsContained, totalCapacity = 180) {
-  // LED fill ratio
   const frac = Math.min(1, ballsContained / totalCapacity);
   unit.led.scale.y = Math.max(0.001, frac);
   unit.led.position.y = (SUPPRESSION.canopyHeight * frac) / 2;
 
-  // Reveal physical balls in the fillGroup proportional to count
   const visibleCount = Math.min(unit.fillGroup.children.length, ballsContained);
   for (let i = 0; i < unit.fillGroup.children.length; i++) {
     unit.fillGroup.children[i].visible = i < visibleCount;
   }
 
-  // Update count badge
   paintCountBadge(unit.countBadge, ballsContained);
 }

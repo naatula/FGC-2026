@@ -99,14 +99,6 @@ export function createScheduler(world) {
     blue: bracePerpXZ(braces.blue),
   };
 
-  function shotTarget(allianceKey) {
-    const unit = suppression[allianceKey];
-    return new THREE.Vector3(
-      unit.group.position.x,
-      0.50,
-      unit.group.position.z - SUPPRESSION.depth * 0.20,
-    );
-  }
   const extinguisherTopTarget = new THREE.Vector3(
     extinguisher.group.position.x,
     EXTINGUISHER.openingHeight + 0.20,
@@ -233,8 +225,19 @@ export function createScheduler(world) {
     return lanes.score[alliance][idx].clone();
   }
 
-  // Climb walk-from snapshot.
-  let walkStart = null;
+  const climbApproachTargets = {
+    red: [],
+    blue: [],
+  };
+  for (const allianceKey of ['red', 'blue']) {
+    const baseXZ = braceBase[allianceKey];
+    const perp = bracePerp[allianceKey];
+    climbApproachTargets[allianceKey] = [
+      new THREE.Vector3(baseXZ.x, 0, baseXZ.z),
+      new THREE.Vector3(baseXZ.x + perp.x * 0.55, 0, baseXZ.z + perp.z * 0.55),
+      new THREE.Vector3(baseXZ.x - perp.x * 0.55, 0, baseXZ.z - perp.z * 0.55),
+    ];
+  }
 
   const pendingThrows = [];
 
@@ -251,7 +254,6 @@ export function createScheduler(world) {
     state.shieldQueueBlue = 0;
 
     claimed.clear();
-    walkStart = null;
     pendingThrows.length = 0;
     shieldQueues.red.length = 0;
     shieldQueues.blue.length = 0;
@@ -319,27 +321,42 @@ export function createScheduler(world) {
   // ---- Projectile launchers ----
 
   function launchSuppArc(ball, fromXZ, allianceKey, startT) {
-    const target = shotTarget(allianceKey);
+    const unit = suppression[allianceKey];
+    const sFront = -half + SUPPRESSION.depth;  // z of front wall face ≈ -2.90
+
+    // Clearance point: just above the suppressor front wall, at the wall face.
+    const clearY  = SUPPRESSION.canopyHeight + 0.10;  // 1.75 m — 10 cm above wall
+    const clearPt = new THREE.Vector3(unit.anchor.x, clearY, sFront);
+    // Drop target: center of suppressor interior at floor level.
+    const target  = new THREE.Vector3(unit.anchor.x, 0.40, unit.group.position.z);
+
     const p0 = new THREE.Vector3(fromXZ.x, 0.45, fromXZ.z);
+
+    // Split total flight time proportionally to each segment's z-span.
+    const dist1 = Math.abs(fromXZ.z - sFront);
+    const dist2 = Math.abs(sFront - target.z);
+    const totalTime = 1.00;
+    const tMid = startT + totalTime * dist1 / (dist1 + dist2);
+    const tEnd = startT + totalTime;
+
     const segments = [];
     const hits = doesShotHit(PARAMS.robotAccuracy);
 
-    segments.push({
-      p0, p1: target, arcH: 2.30,
-      t0: startT, t1: startT + 1.10, visible: true,
-    });
+    // Segment 1: robot → clearance point above the front wall (gentle rising arc).
+    segments.push({ p0, p1: clearPt, arcH: 0.15, t0: startT, t1: tMid, visible: true });
+    // Segment 2: clearance point → inside the unit (drops in past the front wall).
+    segments.push({ p0: clearPt, p1: target, arcH: 0.10, t0: tMid, t1: tEnd, visible: true });
 
-    let endT = startT + 1.10;
+    let endT = tEnd;
     let dest = 'supp';
 
     if (!hits) {
-      // Ball bounces from target to off-field pile
       const missPile = getMissPile(allianceKey);
       segments.push({
         p0: target, p1: missPile, arcH: 0.50,
-        t0: startT + 1.10, t1: startT + 1.80, visible: true,
+        t0: tEnd, t1: tEnd + 0.70, visible: true,
       });
-      endT = startT + 1.80;
+      endT = tEnd + 0.70;
       dest = 'missPile';
     }
 
@@ -728,36 +745,19 @@ export function createScheduler(world) {
     stepShieldQueues(t);
     stepHumanThrows(t);
 
-    // Climb (unchanged)
+    // Climb approach + climb.
     if (t >= SCORING_END) {
-      if (walkStart === null) {
-        walkStart = {
-          red:  robots.red.map(r => r.group.position.clone()),
-          blue: robots.blue.map(r => r.group.position.clone()),
-        };
-      }
       ['red', 'blue'].forEach((allianceKey) => {
         const brace = braces[allianceKey];
-        const baseXZ = braceBase[allianceKey];
         const anchorRobot = robots[allianceKey][0];
         const partners = [robots[allianceKey][1], robots[allianceKey][2]];
 
         if (t < CLIMB_WALK_END) {
-          const k = (t - SCORING_END) / (CLIMB_WALK_END - SCORING_END);
-          const ke = easeInOut(clamp01(k));
-          const perp = bracePerp[allianceKey];
-          const baseTargets = [
-            new THREE.Vector3(baseXZ.x, 0, baseXZ.z),
-            new THREE.Vector3(baseXZ.x + perp.x * 0.55, 0, baseXZ.z + perp.z * 0.55),
-            new THREE.Vector3(baseXZ.x - perp.x * 0.55, 0, baseXZ.z - perp.z * 0.55),
-          ];
           for (let i = 0; i < 3; i++) {
             const r = robots[allianceKey][i];
-            const start = walkStart[allianceKey][i];
-            const target = baseTargets[i];
-            const x = lerp(start.x, target.x, ke);
-            const z = lerp(start.z, target.z, ke);
-            setRobotPosition(r, x, 0, z);
+            const target = climbApproachTargets[allianceKey][i];
+            driveToward(robotStates[allianceKey][i], target.x, target.z, dt);
+            setRobotPosition(r, robotStates[allianceKey][i].pos.x, 0, robotStates[allianceKey][i].pos.z);
             setRobotCarrying(r, false);
             setCarryCount(r, 0);
           }

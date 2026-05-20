@@ -8,17 +8,34 @@ export const FIELD = {
   regionalZoneLength: 4.10,
 };
 
+// Suppression Unit footprint: asymmetric trapezoid. The "main edge" (front
+// face, 90 cm wide) carries the canopy and faces the field. The inner side
+// (facing the Extinguisher) runs straight back, flush with the Extinguisher's
+// outer wall — no gap between the two structures. The outer side angles 60°
+// from the front edge back to the field's back guardrail.
+const _supDepth = 0.60;
+const _supAngleRad = (60 * Math.PI) / 180;
+const _supFrontWidth = 0.90;
+const _supBackOffset = _supDepth / Math.tan(_supAngleRad); // ≈ 0.346 m
+const _supBackWidth = _supFrontWidth + _supBackOffset;     // ≈ 1.246 m
+
 export const SUPPRESSION = {
   height: 2.01,
   canopyHeight: 1.65,
+  ceilingHeight: 2.01,
   canopyOverhang: 0.40,
-  width: 1.10,
-  depth: 0.65,
+  frontWidth: _supFrontWidth,
+  depth: _supDepth,
+  angleRad: _supAngleRad,
+  backOffset: _supBackOffset,
+  backWidth: _supBackWidth,
+  // AABB width used by collision/exclusion code (= back-edge width)
+  width: _supBackWidth,
 };
 
 export const EXTINGUISHER = {
   height: 2.01,
-  width: 1.80,
+  width: 0.90,
   depth: 0.60,
   openingHeight: 1.66,
   ledge: 0.40,
