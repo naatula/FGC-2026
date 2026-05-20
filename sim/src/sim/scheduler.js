@@ -760,6 +760,7 @@ export function createScheduler(world) {
             setRobotPosition(r, robotStates[allianceKey][i].pos.x, 0, robotStates[allianceKey][i].pos.z);
             setRobotCarrying(r, false);
             setCarryCount(r, 0);
+            pushBallsFromRobot(wildfire.balls, robotStates[allianceKey][i].pos.x, robotStates[allianceKey][i].pos.z, -1);
           }
           state.climbZones[allianceKey] = ['—','—','—'];
           state.partnerClimbs[allianceKey] = 0;
