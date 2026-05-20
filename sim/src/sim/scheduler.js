@@ -4,7 +4,7 @@ import {
   SUPPRESSION, EXTINGUISHER, FIRE_SHIELD, BRACE,
 } from '../field/dims.js';
 import { CLIMB, getPhaseName } from './timeline.js';
-import { pickClosestFieldBall, pickClosestFieldBallInZone } from '../entities/Wildfire.js';
+import { pickClosestFieldBall } from '../entities/Wildfire.js';
 import { pointOnBrace } from '../field/buildBrace.js';
 import {
   setRobotPosition, setRobotCarrying, setAnchor, setCarryCount,
@@ -13,6 +13,7 @@ import { setGateOpen } from '../field/buildFireShield.js';
 import { updateMissPileFill } from '../field/buildMissPiles.js';
 import { PARAMS } from './config.js';
 import { buildStaticObstacles, steer } from './steering.js';
+import { pushBallsFromRobot, stepBallPhysics } from './ballPhysics.js';
 
 // State-machine scheduler. Each robot has a `role` (supp|shield), drives
 // itself via a phase machine (toPickup → pickingUp → toScore → expelling),
@@ -114,6 +115,42 @@ export function createScheduler(world) {
 
   // Pre-built static obstacle list for steering.
   buildStaticObstacles(world);
+
+  const BALL_CONFLICT_SQ = (ROBOT.size * 2.0) ** 2;
+
+  function isBallNearOtherRobot(ballX, ballZ, others) {
+    for (const o of others) {
+      const dx = ballX - o.x;
+      const dz = ballZ - o.z;
+      if (dx * dx + dz * dz < BALL_CONFLICT_SQ) return true;
+    }
+    return false;
+  }
+
+  // Like pickClosestFieldBallInZone but skips balls too close to other robots.
+  function pickBallNoConflict(from, xRange, zRange, others) {
+    let bestIdx = -1, bestDist = Infinity;
+    for (let i = 0; i < wildfire.balls.length; i++) {
+      const b = wildfire.balls[i];
+      if (b.state !== 'field' || claimed.has(i)) continue;
+      if (b.pos.x < xRange[0] || b.pos.x > xRange[1]) continue;
+      if (b.pos.z < zRange[0] || b.pos.z > zRange[1]) continue;
+      if (isBallNearOtherRobot(b.pos.x, b.pos.z, others)) continue;
+      const d = b.pos.distanceToSquared(from);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    if (bestIdx >= 0) return bestIdx;
+    // Fallback: unrestricted search, still filtering conflicts.
+    bestDist = Infinity;
+    for (let i = 0; i < wildfire.balls.length; i++) {
+      const b = wildfire.balls[i];
+      if (b.state !== 'field' || claimed.has(i)) continue;
+      if (isBallNearOtherRobot(b.pos.x, b.pos.z, others)) continue;
+      const d = b.pos.distanceToSquared(from);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    return bestIdx;
+  }
 
   // Per-alliance shield queue: ball indices waiting for human-player throw.
   const shieldQueues = { red: [], blue: [] };
@@ -256,6 +293,8 @@ export function createScheduler(world) {
       const b = wildfire.balls[i];
       b.state = 'pending';
       b.fly = null;
+      b.vel.x = 0;
+      b.vel.z = 0;
       b.pos = extinguisher.spawnSlot.clone().add(new THREE.Vector3(
         (Math.random() - 0.5) * 1.4,
         WILDFIRE.radius + Math.random() * 0.15,
@@ -515,9 +554,8 @@ export function createScheduler(world) {
       // Acquire a ball claim if none.
       if (s.targetBallIdx === -1) {
         const lane = lanes.swim[s.alliance][s.idx];
-        const idx = pickClosestFieldBallInZone(
-          wildfire, s.pos, lane.xRange, lane.zRange, claimed
-        );
+        const others = gatherOthers(s);
+        const idx = pickBallNoConflict(s.pos, lane.xRange, lane.zRange, others);
         if (idx >= 0) {
           s.targetBallIdx = idx;
           claimed.add(idx);
@@ -531,6 +569,12 @@ export function createScheduler(world) {
       // Ball might have been collected by something else somehow — guard.
       const b = wildfire.balls[s.targetBallIdx];
       if (!b || b.state !== 'field') {
+        claimed.delete(s.targetBallIdx);
+        s.targetBallIdx = -1;
+        return;
+      }
+      // Abandon if another robot has moved too close to the targeted ball.
+      if (isBallNearOtherRobot(b.pos.x, b.pos.z, gatherOthers(s))) {
         claimed.delete(s.targetBallIdx);
         s.targetBallIdx = -1;
         return;
@@ -596,6 +640,7 @@ export function createScheduler(world) {
     setRobotPosition(robot, s.pos.x, 0, s.pos.z);
     setCarryCount(robot, s.carry);
     setRobotCarrying(robot, false);
+    pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, s.targetBallIdx);
   }
 
   // Carried balls aren't owned per-robot in the ball record, but we
@@ -725,6 +770,7 @@ export function createScheduler(world) {
       });
     }
 
+    stepBallPhysics(wildfire.balls, dt);
     wildfire.update();
     return state;
   }

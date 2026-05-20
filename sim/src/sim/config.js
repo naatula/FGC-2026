@@ -15,6 +15,7 @@ export const DEFAULTS = {
   avoidStrength: 1.5,
   robotAccuracy: 80,      // % (0-100), robot suppression-unit shot hit rate
   humanAccuracy: 80,      // % (0-100), human throw hit rate
+  ballFriction: 0.3,      // m/s², rolling deceleration for pushed balls
   roles: {
     red:  ['supp', 'shield', 'supp'],
     blue: ['supp', 'shield', 'supp'],

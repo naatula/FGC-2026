@@ -141,6 +141,7 @@ const SLIDER_KEYS = [
   ['avoidStrength', (v) => v.toFixed(1)],
   ['robotAccuracy', (v) => String(v|0)],
   ['humanAccuracy', (v) => String(v|0)],
+  ['ballFriction', (v) => v.toFixed(1)],
 ];
 
 function refreshCfgUI() {
