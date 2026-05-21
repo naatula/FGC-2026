@@ -320,6 +320,61 @@
       line-height: 1.5;
     }
     #legend strong { color: var(--text); }
+
+    /* Narrow viewports: stack canvas on top, panels in flow below */
+    @media (max-width: 1199px) {
+      html, body {
+        overflow: auto;
+        height: auto;
+        min-height: 100%;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      #canvas-root {
+        position: relative;
+        inset: auto;
+        width: 100%;
+        height: 60vh;
+        flex: 0 0 60vh;
+      }
+      #banner,
+      #side,
+      #controls,
+      #config-panel,
+      #legend {
+        position: static;
+        transform: none;
+        inset: auto;
+        margin: 8px auto;
+        width: min(100% - 16px, 480px);
+        max-width: 100%;
+        pointer-events: auto;
+      }
+      #banner {
+        grid-template-columns: 1fr;
+        min-width: 0;
+      }
+      .score {
+        min-width: 0;
+      }
+      #side {
+        width: min(100% - 16px, 480px);
+      }
+      #config-panel {
+        width: min(100% - 16px, 480px);
+      }
+      #controls {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      #legend {
+        max-width: none;
+        margin-bottom: 16px;
+      }
+    }
   </style>
 </head>
 <body>

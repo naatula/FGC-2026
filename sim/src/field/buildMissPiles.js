@@ -47,12 +47,9 @@ function makePile() {
     color: COLORS.wildfire, roughness: 0.65
   });
   
-  // Grid: 5 columns × 4 rows per layer, multiple layers high
   const cols = 5;
   const rows = 4;
-  const maxLayers = 10; // enough for captured balls
-  
-  for (let i = 0; i < cols * rows * maxLayers; i++) {
+  for (let i = 0; i < WILDFIRE.count; i++) {
     const m = new THREE.Mesh(ballGeo, ballMat);
     const layer = Math.floor(i / (cols * rows));
     const idxInLayer = i % (cols * rows);

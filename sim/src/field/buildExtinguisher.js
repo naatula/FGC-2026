@@ -88,7 +88,7 @@ export function buildExtinguisher(scene) {
     color: COLORS.wildfire, roughness: 0.65
   });
   const cols = 7, rows = 4;
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < WILDFIRE.count; i++) {
     const m = new THREE.Mesh(ballGeo, ballMat);
     const layer = Math.floor(i / (cols * rows));
     const idx = i % (cols * rows);

@@ -17,19 +17,20 @@ import { FIELD, MATCH } from './field/dims.js';
 import { PARAMS, DEFAULTS, resetParams } from './sim/config.js';
 
 // ---------- Three.js scaffolding ----------
+const canvasRoot = document.getElementById('canvas-root');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(canvasRoot.clientWidth, canvasRoot.clientHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = false;
-document.getElementById('canvas-root').appendChild(renderer.domElement);
+canvasRoot.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0a12);
 scene.fog = new THREE.Fog(0x0a0a12, 18, 40);
 
 const camera = new THREE.PerspectiveCamera(
-  50, window.innerWidth / window.innerHeight, 0.1, 200
+  50, canvasRoot.clientWidth / canvasRoot.clientHeight, 0.1, 200
 );
 camera.position.set(6, 6, 8);
 camera.lookAt(0, 1, 0);
@@ -221,9 +222,11 @@ function animate() {
 }
 
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const w = canvasRoot.clientWidth;
+  const h = canvasRoot.clientHeight;
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(w, h);
 });
 
 // Initial state visible on first paint

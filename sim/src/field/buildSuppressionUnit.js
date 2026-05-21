@@ -173,22 +173,18 @@ function makeUnit(color, ledColor) {
     color: COLORS.wildfire, roughness: 0.65,
   });
   const cols = 7, rows = 4;
-  const layerHeight = ch - 0.2;
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < WILDFIRE.count; i++) {
     const m = new THREE.Mesh(ballGeo, ballMat);
     const layer = Math.floor(i / (cols * rows));
     const idxInLayer = i % (cols * rows);
     const r = Math.floor(idxInLayer / cols);
     const c = idxInLayer % cols;
     const jitter = (Math.random() - 0.5) * 0.01;
-    // pile centered under the front opening for visibility
     m.position.set(
       frontCenterX + (c - (cols - 1) / 2) * (WILDFIRE.radius * 2.05) + jitter,
-      WILDFIRE.radius + layer * (WILDFIRE.radius * 1.7) +
-        (r * 0.02) + jitter,
+      WILDFIRE.radius + layer * (WILDFIRE.radius * 1.7) + (r * 0.02) + jitter,
       (r - (rows - 1) / 2) * (WILDFIRE.radius * 1.6) + jitter
     );
-    if (m.position.y > layerHeight) break;
     m.visible = false;
     fillGroup.add(m);
   }

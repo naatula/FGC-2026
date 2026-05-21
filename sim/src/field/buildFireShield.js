@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FIRE_SHIELD, FIELD, COLORS, ROBOT } from './dims.js';
+import { FIRE_SHIELD, FIELD, COLORS, ROBOT, WILDFIRE } from './dims.js';
 
 // FIRE SHIELDS — one per alliance, in the two front (+Z) corners of the field.
 // Geometry per the 2026 FGC manual & image3.png: a triangular structure tucked
@@ -194,6 +194,30 @@ export function buildFireShields(scene) {
     floor.position.y = 0.015;
     group.add(floor);
 
+    // Ball pile for queue visualization — sits on the shield floor interior
+    const fillGroup = new THREE.Group();
+    const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 10, 8);
+    const ballMat = new THREE.MeshStandardMaterial({ color: COLORS.wildfire, roughness: 0.65 });
+    const pileCols = 3, pileRows = 2;
+    const pileCenterX = (P1x + cornerX) / 2;
+    const pileCenterZ = cornerZ - EXTENSION_DEPTH / 2;
+    for (let i = 0; i < WILDFIRE.count; i++) {
+      const m = new THREE.Mesh(ballGeo, ballMat);
+      const layer = Math.floor(i / (pileCols * pileRows));
+      const idxInLayer = i % (pileCols * pileRows);
+      const pr = Math.floor(idxInLayer / pileCols);
+      const pc = idxInLayer % pileCols;
+      const jitter = (Math.random() - 0.5) * 0.01;
+      m.position.set(
+        pileCenterX + (pc - (pileCols - 1) / 2) * (WILDFIRE.radius * 2.05) + jitter,
+        WILDFIRE.radius + layer * (WILDFIRE.radius * 1.7) + jitter,
+        pileCenterZ + (pr - (pileRows - 1) / 2) * (WILDFIRE.radius * 1.6) + jitter
+      );
+      m.visible = false;
+      fillGroup.add(m);
+    }
+    group.add(fillGroup);
+
     // Count badge (floating number)
     const countBadge = makeCountSprite();
     countBadge.sprite.position.set(Mx, portH + 0.4, Mz);
@@ -232,7 +256,7 @@ export function buildFireShields(scene) {
       chuteExit: throwSpawn,
       normal: new THREE.Vector3(normX, 0, normZ),
       wallMidpoint: new THREE.Vector3(Mx, 0, Mz),
-      countBadge,
+      countBadge, fillGroup,
       corners: { P1: new THREE.Vector3(P1x, 0, P1z),
                  P2: new THREE.Vector3(P2x, 0, P2z),
                  C:  new THREE.Vector3(cornerX, 0, cornerZ) },
@@ -254,4 +278,8 @@ export function setGateOpen(shield, open) {
 
 export function updateFireShieldFill(shield, ballsContained, color = '#f0b840') {
   paintCountBadge(shield.countBadge, ballsContained, color);
+  const visibleCount = Math.min(shield.fillGroup.children.length, ballsContained);
+  for (let i = 0; i < shield.fillGroup.children.length; i++) {
+    shield.fillGroup.children[i].visible = i < visibleCount;
+  }
 }
