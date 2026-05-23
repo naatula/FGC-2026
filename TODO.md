@@ -17,6 +17,6 @@
 - [x] **#10 Add end-of-match overlay** — when `simTime >= MATCH.durationSec` the sim silently halts. Add a "MATCH OVER" overlay showing final scores and a prompt to restart.
 
 ## Performance / code quality
-- [ ] **#11 Spatial hash for ball-ball physics** — `stepBallPhysics` checks all O(n²) = 124,750 pairs of 500 balls every tick. A simple fixed-cell spatial grid reduces this to ~O(n) average.
-- [ ] **#12 Replace 2,500 pre-allocated fill meshes** — suppression units, extinguisher, and fire shields each pre-create 500 invisible sphere meshes for fill visualization (2,500 total). Replace with a small proxy pool (≤50 spheres) scaled by fill fraction.
-- [ ] **#13 Extract shared badge utility** — `makeCountSprite` / `paintCountBadge` is copy-pasted verbatim across `buildSuppressionUnit.js`, `buildFireShield.js`, `buildExtinguisher.js`, and `Robot.js`. Extract to `src/ui/badge.js`.
+- [x] **#11 Spatial hash for ball-ball physics** — `stepBallPhysics` checks all O(n²) = 124,750 pairs of 500 balls every tick. A simple fixed-cell spatial grid reduces this to ~O(n) average.
+- [x] **#12 Replace 2,500 pre-allocated fill meshes** — suppression units, extinguisher, and fire shields each pre-create 500 invisible sphere meshes for fill visualization (2,500 total). Replace with a small proxy pool (≤50 spheres) scaled by fill fraction.
+- [x] **#13 Extract shared badge utility** — `makeCountSprite` / `paintCountBadge` is copy-pasted verbatim across `buildSuppressionUnit.js`, `buildFireShield.js`, `buildExtinguisher.js`, and `Robot.js`. Extract to `src/ui/badge.js`.

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SUPPRESSION, FIELD, EXTINGUISHER, COLORS, WILDFIRE } from './dims.js';
+import { makeCountSprite, paintCountBadge } from '../ui/badge.js';
 
 // Suppression Units flank the Extinguisher at the back of the field. Footprint
 // is an asymmetric trapezoid (plan view, red on +X):
@@ -22,37 +23,6 @@ import { SUPPRESSION, FIELD, EXTINGUISHER, COLORS, WILDFIRE } from './dims.js';
 //   so inner side is at x = -backWidth/2, back side at z = -depth/2.
 
 const POLYCARB_OPACITY = 0.18;
-
-function makeCountSprite() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64; canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = THREE.LinearFilter;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: tex, transparent: true, depthTest: false,
-  }));
-  sprite.renderOrder = 10;
-  return { sprite, canvas, ctx, tex };
-}
-
-function paintCountBadge(badge, n) {
-  const { canvas, ctx, tex } = badge;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.beginPath();
-  ctx.arc(32, 32, 28, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(20,20,30,0.92)';
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = '#f0b840';
-  ctx.stroke();
-  ctx.font = 'bold 36px Segoe UI, sans-serif';
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(n), 32, 34);
-  tex.needsUpdate = true;
-}
 
 function makeUnit(color, ledColor) {
   const g = new THREE.Group();
@@ -164,14 +134,17 @@ function makeUnit(color, ledColor) {
   led.position.set(0, 0, -d / 2 + 0.05);
   g.add(led);
 
-  // Containment "fill" — pre-make spheres in a stack inside the trapezoid.
+  // Containment fill — proxy pool of MAX_FILL_PROXY spheres (instead of
+  // one-per-ball) so the scene doesn't carry 500 hidden meshes per unit.
+  // visibleCount is scaled proportionally by updateSuppressionFill().
+  const MAX_FILL_PROXY = 48;
   const fillGroup = new THREE.Group();
-  const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 10, 8);
+  const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 8, 6);
   const ballMat = new THREE.MeshStandardMaterial({
     color: COLORS.wildfire, roughness: 0.65,
   });
-  const cols = 7, rows = 4;
-  for (let i = 0; i < WILDFIRE.count; i++) {
+  const cols = 6, rows = 4;
+  for (let i = 0; i < MAX_FILL_PROXY; i++) {
     const m = new THREE.Mesh(ballGeo, ballMat);
     const layer = Math.floor(i / (cols * rows));
     const idxInLayer = i % (cols * rows);
@@ -241,8 +214,10 @@ export function updateSuppressionFill(unit, ballsContained, totalCapacity = 180)
   unit.led.scale.y = Math.max(0.001, frac);
   unit.led.position.y = (SUPPRESSION.canopyHeight * frac) / 2;
 
-  const visibleCount = Math.min(unit.fillGroup.children.length, ballsContained);
-  for (let i = 0; i < unit.fillGroup.children.length; i++) {
+  // Scale visible proxies to fill fraction rather than one-per-ball.
+  const n = unit.fillGroup.children.length;
+  const visibleCount = Math.round(frac * n);
+  for (let i = 0; i < n; i++) {
     unit.fillGroup.children[i].visible = i < visibleCount;
   }
 

@@ -1,36 +1,6 @@
 import * as THREE from 'three';
 import { EXTINGUISHER, FIELD, SUPPRESSION, COLORS, WILDFIRE } from './dims.js';
-
-function makeCountSprite() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64; canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = THREE.LinearFilter;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: tex, transparent: true, depthTest: false,
-  }));
-  sprite.renderOrder = 10;
-  return { sprite, canvas, ctx, tex };
-}
-
-function paintCountBadge(badge, n) {
-  const { canvas, ctx, tex } = badge;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.beginPath();
-  ctx.arc(32, 32, 28, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(20,20,30,0.92)';
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = COLORS.gold;
-  ctx.stroke();
-  ctx.font = 'bold 36px Segoe UI, sans-serif';
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(n), 32, 34);
-  tex.needsUpdate = true;
-}
+import { makeCountSprite, paintCountBadge } from '../ui/badge.js';
 
 export function buildExtinguisher(scene) {
   const g = new THREE.Group();
@@ -81,14 +51,16 @@ export function buildExtinguisher(scene) {
   slot.position.set(0, EXTINGUISHER.baseSlotHeight / 2, -EXTINGUISHER.depth / 2 + 0.02);
   g.add(slot);
 
-  // Containment fill visualization (balls pile up in the back portion)
+  // Containment fill visualization — proxy pool of 48 spheres scaled to
+  // fill fraction so the extinguisher doesn't carry 500 hidden meshes.
+  const MAX_FILL_PROXY = 48;
   const fillGroup = new THREE.Group();
-  const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 10, 8);
+  const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 8, 6);
   const ballMat = new THREE.MeshStandardMaterial({
     color: COLORS.wildfire, roughness: 0.65
   });
-  const cols = 7, rows = 4;
-  for (let i = 0; i < WILDFIRE.count; i++) {
+  const cols = 6, rows = 4;
+  for (let i = 0; i < MAX_FILL_PROXY; i++) {
     const m = new THREE.Mesh(ballGeo, ballMat);
     const layer = Math.floor(i / (cols * rows));
     const idx = i % (cols * rows);
@@ -160,8 +132,9 @@ export function updateExtinguisherFill(ext, ballsContained, totalCapacity = 100)
   const frac = Math.min(1, ballsContained / totalCapacity);
   ext.led.scale.y = Math.max(0.001, frac);
   ext.led.position.y = (EXTINGUISHER.openingHeight * 0.7 * frac) / 2;
-  const visibleCount = Math.min(ext.fillGroup.children.length, ballsContained);
-  for (let i = 0; i < ext.fillGroup.children.length; i++) {
+  const n = ext.fillGroup.children.length;
+  const visibleCount = Math.round(frac * n);
+  for (let i = 0; i < n; i++) {
     ext.fillGroup.children[i].visible = i < visibleCount;
   }
   paintCountBadge(ext.countBadge, ballsContained);

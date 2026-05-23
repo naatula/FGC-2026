@@ -106,8 +106,8 @@ export function updateHud(state, t, totalSec, world) {
   // Fire shield queue visuals
   const shieldQueueRed = state.shieldQueueRed ?? 0;
   const shieldQueueBlue = state.shieldQueueBlue ?? 0;
-  updateFireShieldFill(world.fireShields.red, shieldQueueRed, COLORS.red);
-  updateFireShieldFill(world.fireShields.blue, shieldQueueBlue, COLORS.blue);
+  updateFireShieldFill(world.fireShields.red,  shieldQueueRed,  '#' + COLORS.red.toString(16).padStart(6, '0'));
+  updateFireShieldFill(world.fireShields.blue, shieldQueueBlue, '#' + COLORS.blue.toString(16).padStart(6, '0'));
 }
 
 export function resetHudCache() {

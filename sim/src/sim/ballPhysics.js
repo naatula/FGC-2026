@@ -202,43 +202,82 @@ export function stepBallPhysics(balls, dt) {
     }
   }
 
-  // Ball-ball collisions: only pairs where at least one is rolling.
+  // Ball-ball collisions via spatial hash — O(n) average instead of O(n²).
+  // Cell size = CONTACT_BB so neighbours are always in adjacent cells only.
+  const CELL = CONTACT_BB;           // 0.10 m
+  const ORIGIN = -_half;             // field spans [-half, +half]
+  const NCELLS = Math.ceil(FIELD.size / CELL) + 2; // +2 for boundary slack
+
+  // Reuse a flat index array to avoid GC pressure.
+  const cellCount = NCELLS * NCELLS;
+  // grid[c] = array of ball indices in cell c (cleared each frame).
+  const grid = new Array(cellCount);
+  for (let c = 0; c < cellCount; c++) grid[c] = [];
+
+  function cellOf(x, z) {
+    const cx = Math.floor((x - ORIGIN) / CELL);
+    const cz = Math.floor((z - ORIGIN) / CELL);
+    const cx2 = Math.max(0, Math.min(NCELLS - 1, cx));
+    const cz2 = Math.max(0, Math.min(NCELLS - 1, cz));
+    return cz2 * NCELLS + cx2;
+  }
+
+  // Insert active balls into grid.
   for (let i = 0; i < balls.length; i++) {
     const bi = balls[i];
     if (bi.state !== 'field' && bi.state !== 'rolling') continue;
+    grid[cellOf(bi.pos.x, bi.pos.z)].push(i);
+  }
 
-    for (let j = i + 1; j < balls.length; j++) {
-      const bj = balls[j];
-      if (bj.state !== 'field' && bj.state !== 'rolling') continue;
-      if (bi.state !== 'rolling' && bj.state !== 'rolling') continue;
+  // For each rolling ball, check only its own cell and the 8 neighbours.
+  for (let i = 0; i < balls.length; i++) {
+    const bi = balls[i];
+    if (bi.state !== 'rolling') continue;
 
-      const dx = bj.pos.x - bi.pos.x;
-      const dz = bj.pos.z - bi.pos.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist >= CONTACT_BB || dist < 1e-6) continue;
+    const cx = Math.floor((bi.pos.x - ORIGIN) / CELL);
+    const cz = Math.floor((bi.pos.z - ORIGIN) / CELL);
 
-      const nx = dx / dist;
-      const nz = dz / dist;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx2 = cx + dx;
+        const nz2 = cz + dz;
+        if (nx2 < 0 || nx2 >= NCELLS || nz2 < 0 || nz2 >= NCELLS) continue;
+        const cell = grid[nz2 * NCELLS + nx2];
+        for (let k = 0; k < cell.length; k++) {
+          const j = cell[k];
+          if (j <= i) continue;           // each pair once
+          const bj = balls[j];
+          if (bj.state !== 'field' && bj.state !== 'rolling') continue;
 
-      const overlap = (CONTACT_BB - dist) * 0.5;
-      bi.pos.x -= nx * overlap;
-      bi.pos.z -= nz * overlap;
-      bj.pos.x += nx * overlap;
-      bj.pos.z += nz * overlap;
+          const ddx = bj.pos.x - bi.pos.x;
+          const ddz = bj.pos.z - bi.pos.z;
+          const dist = Math.hypot(ddx, ddz);
+          if (dist >= CONTACT_BB || dist < 1e-6) continue;
 
-      const vi_n = bi.vel.x * nx + bi.vel.z * nz;
-      const vj_n = bj.vel.x * nx + bj.vel.z * nz;
-      const relVn = vi_n - vj_n;
-      if (relVn <= 0) continue;
+          const nx = ddx / dist;
+          const nz = ddz / dist;
+          const overlap = (CONTACT_BB - dist) * 0.5;
+          bi.pos.x -= nx * overlap;
+          bi.pos.z -= nz * overlap;
+          bj.pos.x += nx * overlap;
+          bj.pos.z += nz * overlap;
 
-      const imp = (1 + BALL_RESTITUTION) * 0.5 * relVn;
-      bi.vel.x -= imp * nx;
-      bi.vel.z -= imp * nz;
-      bj.vel.x += imp * nx;
-      bj.vel.z += imp * nz;
-
-      if (bj.state === 'field') bj.state = 'rolling';
-      if (bi.state === 'field') bi.state = 'rolling';
+          const vi_n = bi.vel.x * nx + bi.vel.z * nz;
+          const vj_n = bj.vel.x * nx + bj.vel.z * nz;
+          const relVn = vi_n - vj_n;
+          if (relVn > 0) {
+            const imp = (1 + BALL_RESTITUTION) * 0.5 * relVn;
+            bi.vel.x -= imp * nx;
+            bi.vel.z -= imp * nz;
+            bj.vel.x += imp * nx;
+            bj.vel.z += imp * nz;
+          }
+          if (bj.state === 'field') bj.state = 'rolling';
+          if (bi.state === 'field') bi.state = 'rolling';
+        }
+      }
     }
   }
+  // Clear grid for next frame.
+  for (let c = 0; c < cellCount; c++) grid[c].length = 0;
 }

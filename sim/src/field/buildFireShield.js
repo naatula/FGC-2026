@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FIRE_SHIELD, FIELD, COLORS, ROBOT, WILDFIRE } from './dims.js';
+import { makeCountSprite, paintCountBadge } from '../ui/badge.js';
 
 // FIRE SHIELDS — one per alliance, in the two front (+Z) corners of the field.
 // Geometry per the 2026 FGC manual & image3.png: a triangular structure tucked
@@ -24,37 +25,6 @@ const EXTENSION_DEPTH = 1.00;             // shield is extended 1 m toward -Z
                                           // lengthens; a new inboard wall
                                           // closes the gap to the front
                                           // guardrail.
-
-function makeCountSprite() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64; canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = THREE.LinearFilter;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: tex, transparent: true, depthTest: false,
-  }));
-  sprite.renderOrder = 10;
-  return { sprite, canvas, ctx, tex };
-}
-
-function paintCountBadge(badge, n, color = '#f0b840') {
-  const { canvas, ctx, tex } = badge;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.beginPath();
-  ctx.arc(32, 32, 28, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(20,20,30,0.92)';
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = color;
-  ctx.stroke();
-  ctx.font = 'bold 36px Segoe UI, sans-serif';
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(n), 32, 34);
-  tex.needsUpdate = true;
-}
 
 export function buildFireShields(scene) {
   const half = FIELD.size / 2;
@@ -194,14 +164,16 @@ export function buildFireShields(scene) {
     floor.position.y = 0.015;
     group.add(floor);
 
-    // Ball pile for queue visualization — sits on the shield floor interior
+    // Ball pile for queue visualization — proxy pool of 24 spheres scaled
+    // to queue depth, replacing 500 hidden meshes per shield.
+    const MAX_FILL_PROXY = 24;
     const fillGroup = new THREE.Group();
-    const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 10, 8);
+    const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 8, 6);
     const ballMat = new THREE.MeshStandardMaterial({ color: COLORS.wildfire, roughness: 0.65 });
-    const pileCols = 3, pileRows = 2;
+    const pileCols = 4, pileRows = 2;
     const pileCenterX = (P1x + cornerX) / 2;
     const pileCenterZ = cornerZ - EXTENSION_DEPTH / 2;
-    for (let i = 0; i < WILDFIRE.count; i++) {
+    for (let i = 0; i < MAX_FILL_PROXY; i++) {
       const m = new THREE.Mesh(ballGeo, ballMat);
       const layer = Math.floor(i / (pileCols * pileRows));
       const idxInLayer = i % (pileCols * pileRows);
@@ -278,8 +250,11 @@ export function setGateOpen(shield, open) {
 
 export function updateFireShieldFill(shield, ballsContained, color = '#f0b840') {
   paintCountBadge(shield.countBadge, ballsContained, color);
-  const visibleCount = Math.min(shield.fillGroup.children.length, ballsContained);
-  for (let i = 0; i < shield.fillGroup.children.length; i++) {
+  const QUEUE_CAP = 20; // reference max for visual scaling
+  const frac = Math.min(1, ballsContained / QUEUE_CAP);
+  const n = shield.fillGroup.children.length;
+  const visibleCount = Math.round(frac * n);
+  for (let i = 0; i < n; i++) {
     shield.fillGroup.children[i].visible = i < visibleCount;
   }
 }
