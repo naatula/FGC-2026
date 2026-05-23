@@ -80,8 +80,6 @@ function makeUnit(color, ledColor) {
   const h  = SUPPRESSION.height;
   const ch = SUPPRESSION.canopyHeight;
   const ceil = SUPPRESSION.ceilingHeight;
-  const co = SUPPRESSION.canopyOverhang;
-
   // Front face X span (local): from -bw/2 to -bw/2 + fw
   const frontMinX = -bw / 2;
   const frontMaxX = -bw / 2 + fw;

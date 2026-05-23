@@ -354,11 +354,36 @@
         pointer-events: auto;
       }
       #banner {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr auto 1fr;
         min-width: 0;
+        gap: 6px;
       }
       .score {
         min-width: 0;
+        padding: 6px 8px 8px;
+      }
+      .score .value {
+        font-size: 1.8rem;
+      }
+      .score .breakdown {
+        font-size: 0.62rem;
+        line-height: 1.35;
+      }
+      #timer-wrap {
+        min-width: 0;
+        width: max-content;
+        padding: 6px 8px;
+      }
+      #timer {
+        font-size: 1.4rem;
+      }
+      #phase {
+        font-size: 0.62rem;
+      }
+      #coop {
+        font-size: 0.6rem;
+        padding: 2px 6px;
+        margin-top: 4px;
       }
       #side {
         width: min(100% - 16px, 480px);
@@ -396,8 +421,8 @@
       <div id="phase">Pre-match</div>
       <div id="coop">Coopertition: —</div>
       <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">
-        Extinguisher: <span id="ext-count" style="color:var(--text);font-weight:700;">0</span>
-        &nbsp; Queue: <span style="color:var(--red);font-weight:700;" id="queue-red">0</span>
+        Extinguisher: <span id="ext-count" style="color:var(--text);font-weight:700;">0</span><br/>
+        Queue: <span style="color:var(--red);font-weight:700;" id="queue-red">0</span>
         / <span style="color:var(--blue);font-weight:700;" id="queue-blue">0</span>
       </div>
     </div>

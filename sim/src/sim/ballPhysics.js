@@ -53,7 +53,7 @@ const OBSTACLES = [
 
 // Check collision with rotated port barrier. Barrier is a thin rectangular plane
 // that blocks balls from freely rolling into the fire shield port.
-function bounceFromPortBarrier(b, barX, barZ, barAngle, openingW, openingH) {
+function bounceFromPortBarrier(b, barX, barZ, barAngle, openingW, _openingH) {
   // Transform ball position to local barrier coordinates
   const cosA = Math.cos(barAngle);
   const sinA = Math.sin(barAngle);

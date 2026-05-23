@@ -12,7 +12,6 @@ function makeBrace(color, lowEndPos, highEndPos) {
   const end = highEndPos.clone();
   const dir = end.clone().sub(start);
   const len = dir.length();
-  const center = start.clone().add(end).multiplyScalar(0.5);
 
   // For each of the three zones, build a colored cylinder segment.
   const zones = [

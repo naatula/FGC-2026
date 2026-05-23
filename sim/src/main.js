@@ -13,8 +13,8 @@ import { makeWildfire } from './entities/Wildfire.js';
 import { buildHumanPlayers } from './entities/HumanPlayer.js';
 import { createScheduler } from './sim/scheduler.js';
 import { initRobotList, updateHud, resetHudCache } from './ui/hud.js';
-import { FIELD, MATCH } from './field/dims.js';
-import { PARAMS, DEFAULTS, resetParams } from './sim/config.js';
+import { MATCH } from './field/dims.js';
+import { PARAMS, resetParams } from './sim/config.js';
 
 // ---------- Three.js scaffolding ----------
 const canvasRoot = document.getElementById('canvas-root');

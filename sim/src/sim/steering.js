@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  FIELD, ROBOT, SUPPRESSION, EXTINGUISHER, FIRE_SHIELD,
+  FIELD, ROBOT, SUPPRESSION, EXTINGUISHER,
 } from '../field/dims.js';
 import { PARAMS } from './config.js';
 
@@ -18,7 +18,6 @@ import { PARAMS } from './config.js';
 // adjusted velocity. The caller integrates with dt.
 
 const TMP_A = new THREE.Vector3();
-const TMP_B = new THREE.Vector3();
 
 // Pre-built static obstacle list. Each entry: { type: 'aabb'|'circle', ... }
 let staticObstacles = null;
@@ -64,7 +63,7 @@ function aabbDist(px, pz, ab) {
   const cz = Math.max(ab.minZ, Math.min(pz, ab.maxZ));
   const dx = px - cx;
   const dz = pz - cz;
-  let d = Math.hypot(dx, dz);
+  const d = Math.hypot(dx, dz);
   if (d < 1e-6) {
     // Inside: push toward nearest edge.
     const dLeft = px - ab.minX, dRight = ab.maxX - px;

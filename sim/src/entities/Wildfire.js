@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  WILDFIRE, COLORS, FIELD, ROBOT, SUPPRESSION, EXTINGUISHER, FIRE_SHIELD,
+  WILDFIRE, COLORS, FIELD, ROBOT, SUPPRESSION, EXTINGUISHER,
 } from '../field/dims.js';
 
 // A pool of `count` wildfire balls implemented as an InstancedMesh.
