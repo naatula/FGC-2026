@@ -20,7 +20,7 @@ const src = (p) => path.resolve(here, '../src', p);
 
 const { computeScores, climbMultiplier, coopertitionBonus, regionalScore } =
   await import(src('sim/scoring.js'));
-const { CLIMB, Z_MID, planTrips, PHASES, getPhaseName } =
+const { CLIMB, Z_MID, planTrips, getPhaseName } =
   await import(src('sim/timeline.js'));
 
 let passed = 0;
@@ -158,9 +158,11 @@ check('R0–R2 score ≥ ROBOT.size (0.50)', dist(score0, score2) >= 0.50);
 check('R1–R2 score ≥ ROBOT.size (0.50)', dist(score1, score2) >= 0.50);
 
 console.log('\n== Phases ==');
-check('phase at t=0 = Pre-rush', getPhaseName(0) === 'Pre-rush');
-check('phase at t=125 = Climb',  getPhaseName(125) === 'Climb');
-check('phase at t=150 = Hold',   getPhaseName(150) === 'Hold');
+check('phase at t=0   = Rush',        getPhaseName(0)   === 'Rush');
+check('phase at t=30  = Sustained Scoring', getPhaseName(30)  === 'Sustained Scoring');
+check('phase at t=113 = Positioning', getPhaseName(113) === 'Positioning');
+check('phase at t=126 = Climb',       getPhaseName(126) === 'Climb');
+check('phase at t=139 = Hold',        getPhaseName(139) === 'Hold');
 
 console.log(`\n${passed} passed, ${failed} failed.`);
 process.exit(failed === 0 ? 0 : 1);

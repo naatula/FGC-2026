@@ -1,13 +1,14 @@
 import { MATCH, BRACE } from '../field/dims.js';
 
 // Phase boundaries (seconds from match start).
+// These must stay in sync with SCORING_END and CLIMB_WALK_END in scheduler.js,
+// and with the CLIMB.unit keyframes below.
 export const PHASES = [
-  { at: 0,    name: 'Pre-rush' },
-  { at: 1,    name: 'Rush' },
-  { at: 30,   name: 'Sustained Scoring' },
-  { at: 90,   name: 'Position' },
-  { at: 125,  name: 'Climb' },
-  { at: 150,  name: 'Hold' },
+  { at: 0,   name: 'Rush' },              // balls scatter, robots charge immediately
+  { at: 30,  name: 'Sustained Scoring' }, // field thinning, steady cycle continues
+  { at: 113, name: 'Positioning' },       // SCORING_END: scoring stops, walk to brace
+  { at: 126, name: 'Climb' },             // CLIMB_WALK_END: hook on, liftoff at 127.5
+  { at: 139, name: 'Hold' },              // Z3 reached, all robots hold to match end
 ];
 
 export function getPhaseName(t) {

@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import {
   WILDFIRE, FIELD, ROBOT,
-  SUPPRESSION, EXTINGUISHER, FIRE_SHIELD, BRACE,
+  SUPPRESSION, EXTINGUISHER, BRACE,
 } from '../field/dims.js';
 import { CLIMB, getPhaseName } from './timeline.js';
-import { pickClosestFieldBall } from '../entities/Wildfire.js';
 import { pointOnBrace } from '../field/buildBrace.js';
 import {
   setRobotPosition, setRobotCarrying, setAnchor, setCarryCount,
@@ -180,7 +179,7 @@ export function createScheduler(world) {
     missBlue: 0,
     climbZones: { red: ['—','—','—'], blue: ['—','—','—'] },
     partnerClimbs: { red: 0, blue: 0 },
-    phase: 'Pre-rush',
+    phase: 'Rush',
     shieldQueueRed: 0,
     shieldQueueBlue: 0,
   };
@@ -249,7 +248,7 @@ export function createScheduler(world) {
     state.missBlue = 0;
     state.climbZones = { red: ['—','—','—'], blue: ['—','—','—'] };
     state.partnerClimbs = { red: 0, blue: 0 };
-    state.phase = 'Pre-rush';
+    state.phase = 'Rush';
     state.shieldQueueRed = 0;
     state.shieldQueueBlue = 0;
 
