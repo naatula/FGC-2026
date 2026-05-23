@@ -19,6 +19,43 @@ function makeLabelSprite(text, color) {
   return new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
 }
 
+// Role colours and letter map.
+const ROLE_COLOR = { supp: '#40c080', shield: '#f0b840', fault: '#e8394a' };
+const ROLE_LETTER = { supp: 'S', shield: 'H', fault: 'F' };
+
+function makeRoleSprite() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: false,
+  }));
+  sprite.renderOrder = 11;
+  return { sprite, canvas, ctx, tex };
+}
+
+function paintRole(badge, role) {
+  const { canvas, ctx, tex } = badge;
+  const color = ROLE_COLOR[role] ?? '#888';
+  const letter = ROLE_LETTER[role] ?? '?';
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.arc(32, 32, 26, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(10,10,18,0.88)';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.font = 'bold 30px Segoe UI, sans-serif';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(letter, 32, 34);
+  tex.needsUpdate = true;
+}
+
 function makeCountSprite() {
   const canvas = document.createElement('canvas');
   canvas.width = 64; canvas.height = 64;
@@ -105,11 +142,19 @@ export function makeRobot(label, allianceColor) {
   paintCount(countBadge, 0);
   g.add(countBadge.sprite);
 
+  // Role indicator badge (S/H/F) — to the left of the label.
+  const roleBadge = makeRoleSprite();
+  roleBadge.sprite.scale.set(0.20, 0.20, 1);
+  roleBadge.sprite.position.set(-0.28, ROBOT.size + 0.30, 0);
+  paintRole(roleBadge, 'supp');
+  g.add(roleBadge.sprite);
+
   return {
     group: g,
     chassis,
     mast,
     countBadge,
+    roleBadge,
     label,
     alliance: allianceColor,
     climbZone: null,
@@ -131,7 +176,19 @@ export function setRobotPosition(robot, x, y, z) {
   robot.group.position.set(x, y, z);
 }
 
+// Rotate the robot group to face a direction given as (dx, dz).
+// No-ops if the vector is near-zero (robot stationary or snapped).
+export function setRobotHeading(robot, dx, dz) {
+  const len = Math.hypot(dx, dz);
+  if (len < 1e-4) return;
+  robot.group.rotation.y = Math.atan2(dx, dz);
+}
+
 export function setAnchor(robot, isAnchor) {
   robot.isAnchor = isAnchor;
   robot.mast.visible = isAnchor;
+}
+
+export function setRobotRole(robot, role) {
+  paintRole(robot.roleBadge, role);
 }

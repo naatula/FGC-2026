@@ -11,10 +11,10 @@
 - [x] **#6 Remove dead `pickClosestFieldBall` / `pickClosestFieldBallInZone` exports** — exported from `Wildfire.js` but never imported anywhere in production code. Scheduler has its own `pickBallNoConflict`. Delete them.
 
 ## Visual quality
-- [ ] **#7 Add robot heading rotation** — robots never rotate toward their direction of travel. Add `robot.group.rotation.y = Math.atan2(dx, dz)` in `updateRobot` based on the vector to the robot's current target.
-- [ ] **#8 Fix partner climb elevation** — during climb, partners are placed at `y = Math.max(0, anchorPos.y)`, floating at the same height as the anchor. Apply a small downward offset so they appear physically latched below/beside the anchor rather than floating alongside it.
-- [ ] **#9 Add role visual indicator on robots** — `supp`, `shield`, and `fault` robots are visually identical. Add a small colored stripe or letter overlay so viewers can identify roles at a glance.
-- [ ] **#10 Add end-of-match overlay** — when `simTime >= MATCH.durationSec` the sim silently halts. Add a "MATCH OVER" overlay showing final scores and a prompt to restart.
+- [x] **#7 Add robot heading rotation** — robots never rotate toward their direction of travel. Add `robot.group.rotation.y = Math.atan2(dx, dz)` in `updateRobot` based on the vector to the robot's current target.
+- [x] **#8 Fix partner climb elevation** — during climb, partners are placed at `y = Math.max(0, anchorPos.y)`, floating at the same height as the anchor. Apply a small downward offset so they appear physically latched below/beside the anchor rather than floating alongside it.
+- [x] **#9 Add role visual indicator on robots** — `supp`, `shield`, and `fault` robots are visually identical. Add a small colored stripe or letter overlay so viewers can identify roles at a glance.
+- [x] **#10 Add end-of-match overlay** — when `simTime >= MATCH.durationSec` the sim silently halts. Add a "MATCH OVER" overlay showing final scores and a prompt to restart.
 
 ## Performance / code quality
 - [ ] **#11 Spatial hash for ball-ball physics** — `stepBallPhysics` checks all O(n²) = 124,750 pairs of 500 balls every tick. A simple fixed-cell spatial grid reduces this to ~O(n) average.

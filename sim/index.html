@@ -305,6 +305,74 @@
     }
     #config-panel .cfg-reset:hover { border-color: var(--gold); }
 
+    /* Match-over overlay */
+    #match-over {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(5, 5, 14, 0.80);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      pointer-events: auto;
+      flex-direction: column;
+      gap: 18px;
+      text-align: center;
+    }
+    #match-over.visible { display: flex; }
+    #match-over h1 {
+      font-size: 2.2rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold);
+      text-shadow: 0 0 24px rgba(240,184,64,0.5);
+    }
+    #match-over .final-scores {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+    }
+    #match-over .final-score {
+      padding: 16px 28px;
+      border-radius: 12px;
+      border: 2px solid;
+      min-width: 140px;
+    }
+    #match-over .final-score.red  { border-color: var(--red);  background: var(--red-dim); }
+    #match-over .final-score.blue { border-color: var(--blue); background: var(--blue-dim); }
+    #match-over .final-score .alliance-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    #match-over .final-score .score-val {
+      font-size: 3rem;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      margin-top: 4px;
+    }
+    #match-over .final-score.red  .score-val { color: var(--red); }
+    #match-over .final-score.blue .score-val { color: var(--blue); }
+    #match-over .vs { font-size: 1.2rem; color: var(--muted); font-weight: 700; }
+    #match-over button {
+      margin-top: 4px;
+      padding: 10px 28px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: inherit;
+      background: var(--gold);
+      color: #111;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 0.06em;
+    }
+    #match-over button:hover { filter: brightness(1.12); }
+
     /* Legend / footer */
     #legend {
       position: absolute;
@@ -323,6 +391,16 @@
 
     /* Narrow viewports: stack canvas on top, panels in flow below */
     @media (max-width: 1199px) {
+      #match-over {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 60vh;
+        padding: 16px;
+      }
+      #match-over h1 { font-size: 1.4rem; }
+      #match-over .final-score .score-val { font-size: 2rem; }
+      #match-over .final-score { padding: 10px 16px; min-width: 100px; }
+    }
       html, body {
         overflow: auto;
         height: auto;
@@ -404,6 +482,22 @@
 </head>
 <body>
   <div id="canvas-root"></div>
+
+  <div id="match-over">
+    <h1>Match Over</h1>
+    <div class="final-scores">
+      <div class="final-score red">
+        <div class="alliance-label">Red Regional</div>
+        <div class="score-val" id="over-red">0</div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="final-score blue">
+        <div class="alliance-label">Blue Regional</div>
+        <div class="score-val" id="over-blue">0</div>
+      </div>
+    </div>
+    <button id="btn-restart-over">⟲ Restart</button>
+  </div>
 
   <div id="banner">
     <div class="score red">

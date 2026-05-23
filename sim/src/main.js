@@ -13,6 +13,7 @@ import { makeWildfire } from './entities/Wildfire.js';
 import { buildHumanPlayers } from './entities/HumanPlayer.js';
 import { createScheduler } from './sim/scheduler.js';
 import { initRobotList, updateHud, resetHudCache } from './ui/hud.js';
+import { computeScores } from './sim/scoring.js';
 import { MATCH } from './field/dims.js';
 import { PARAMS, resetParams } from './sim/config.js';
 
@@ -96,6 +97,23 @@ const btnRestart = document.getElementById('btn-restart');
 const speedSlider = document.getElementById('speed');
 const speedVal = document.getElementById('speed-val');
 const camSelect = document.getElementById('cam');
+const matchOverEl = document.getElementById('match-over');
+const btnRestartOver = document.getElementById('btn-restart-over');
+
+function doRestart() {
+  simTime = 0;
+  playing = false;
+  btnPlay.textContent = '▶ Play';
+  matchOverEl.classList.remove('visible');
+  scheduler.reset();
+  resetHudCache();
+}
+
+function showMatchOver(scores) {
+  document.getElementById('over-red').textContent  = scores.red;
+  document.getElementById('over-blue').textContent = scores.blue;
+  matchOverEl.classList.add('visible');
+}
 
 btnPlay.addEventListener('click', () => {
   playing = !playing;
@@ -103,13 +121,8 @@ btnPlay.addEventListener('click', () => {
   lastReal = performance.now();
 });
 
-btnRestart.addEventListener('click', () => {
-  simTime = 0;
-  playing = false;
-  btnPlay.textContent = '▶ Play';
-  scheduler.reset();
-  resetHudCache();
-});
+btnRestart.addEventListener('click', doRestart);
+btnRestartOver.addEventListener('click', doRestart);
 
 speedSlider.addEventListener('input', () => {
   speed = parseFloat(speedSlider.value);
@@ -204,18 +217,24 @@ function animate() {
   const dtReal = (now - lastReal) / 1000;
   lastReal = now;
 
+  let matchJustEnded = false;
   if (playing) {
     simTime += dtReal * speed;
     if (simTime >= MATCH.durationSec) {
       simTime = MATCH.durationSec;
       playing = false;
       btnPlay.textContent = '▶ Play';
+      matchJustEnded = true;
     }
   }
 
   // Always step (so HUD updates on first frame and after restart)
   const state = scheduler.step(simTime);
   updateHud(state, simTime, MATCH.durationSec, world);
+
+  if (matchJustEnded) {
+    showMatchOver(computeScores(state));
+  }
 
   controls.update();
   renderer.render(scene, camera);

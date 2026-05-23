@@ -6,7 +6,7 @@ import {
 import { CLIMB, getPhaseName, SCORING_END, CLIMB_WALK_END } from './timeline.js';
 import { pointOnBrace } from '../field/buildBrace.js';
 import {
-  setRobotPosition, setAnchor, setCarryCount,
+  setRobotPosition, setRobotHeading, setRobotRole, setAnchor, setCarryCount,
 } from '../entities/Robot.js';
 import { setGateOpen } from '../field/buildFireShield.js';
 import { updateMissPileFill } from '../field/buildMissPiles.js';
@@ -165,6 +165,8 @@ export function createScheduler(world) {
       targetBallIdx: -1,
       pickupTimer: 0,
       expelTimer: 0,
+      headingDx: 0,
+      headingDz: 1,
     };
   }
 
@@ -274,7 +276,10 @@ export function createScheduler(world) {
         s.targetBallIdx = -1;
         s.pickupTimer = 0;
         s.expelTimer = 0;
+        s.headingDx = 0;
+        s.headingDz = 1;
         setRobotPosition(r, p.x, 0, p.z);
+        setRobotHeading(r, 0, 1);
         setCarryCount(r, 0);
       }
     }
@@ -546,6 +551,9 @@ export function createScheduler(world) {
       s.pos.z = targetZ;
       return true;
     }
+    // Record heading (to target) before steering deflects the velocity.
+    s.headingDx = dx / dist;
+    s.headingDz = dz / dist;
     const vx = (dx / dist) * speed;
     const vz = (dz / dist) * speed;
     TMP_V.set(vx, 0, vz);
@@ -584,6 +592,7 @@ export function createScheduler(world) {
         }
       }
       setRobotPosition(robot, s.pos.x, 0, s.pos.z);
+      setRobotHeading(robot, s.headingDx, s.headingDz);
       setCarryCount(robot, 0);
       pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, -1);
       return;
@@ -677,6 +686,7 @@ export function createScheduler(world) {
     }
 
     setRobotPosition(robot, s.pos.x, 0, s.pos.z);
+    setRobotHeading(robot, s.headingDx, s.headingDz);
     setCarryCount(robot, s.carry);
     pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, s.targetBallIdx);
   }
@@ -747,11 +757,13 @@ export function createScheduler(world) {
         if (t < CLIMB_WALK_END) {
           for (let i = 0; i < 3; i++) {
             const r = robots[allianceKey][i];
+            const rs = robotStates[allianceKey][i];
             const target = climbApproachTargets[allianceKey][i];
-            driveToward(robotStates[allianceKey][i], target.x, target.z, dt);
-            setRobotPosition(r, robotStates[allianceKey][i].pos.x, 0, robotStates[allianceKey][i].pos.z);
+            driveToward(rs, target.x, target.z, dt);
+            setRobotPosition(r, rs.pos.x, 0, rs.pos.z);
+            setRobotHeading(r, rs.headingDx, rs.headingDz);
             setCarryCount(r, 0);
-            pushBallsFromRobot(wildfire.balls, robotStates[allianceKey][i].pos.x, robotStates[allianceKey][i].pos.z, -1);
+            pushBallsFromRobot(wildfire.balls, rs.pos.x, rs.pos.z, -1);
           }
           state.climbZones[allianceKey] = ['—','—','—'];
           state.partnerClimbs[allianceKey] = 0;
@@ -767,11 +779,14 @@ export function createScheduler(world) {
           const sideMag = 0.55;
           const sideDir = [+1, -1];
           const fieldEdge = FIELD.size / 2 - 0.10;
+          // Partners hang from the anchor: offset slightly below it so they
+          // appear latched on rather than floating alongside.
+          const partnerDropY = ROBOT.size * 0.7; // ≈ one chassis height below anchor
           for (let pi = 0; pi < 2; pi++) {
             const s = sideDir[pi] * sideMag;
             let px = anchorPos.x + perp.x * s;
             let pz = anchorPos.z + perp.z * s;
-            const py = Math.max(0, anchorPos.y);
+            const py = Math.max(0, anchorPos.y - partnerDropY);
             px = Math.max(-fieldEdge, Math.min(fieldEdge, px));
             pz = Math.max(-fieldEdge, Math.min(fieldEdge, pz));
             setRobotPosition(partners[pi], px, py, pz);
@@ -788,6 +803,14 @@ export function createScheduler(world) {
           state.partnerClimbs[allianceKey] = (z === 'Contact' || z === '—') ? 0 : 2;
         }
       });
+    }
+
+    // Sync role badge on each robot (reads live PARAMS so config changes
+    // are reflected immediately without a restart).
+    for (const alliance of ['red', 'blue']) {
+      for (let i = 0; i < 3; i++) {
+        setRobotRole(robots[alliance][i], PARAMS.roles[alliance][i]);
+      }
     }
 
     stepBallPhysics(wildfire.balls, dt);
