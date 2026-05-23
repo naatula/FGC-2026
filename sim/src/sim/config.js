@@ -6,6 +6,7 @@ import { ROBOT } from '../field/dims.js';
 
 export const DEFAULTS = {
   driveSpeed: 1.2,         // m/s
+  turnSpeed: 180,          // °/s — angular speed limit when changing heading
   capacity: 8,             // balls/robot
   shootInterval: 4.0,      // s/ball, suppression-unit shot
   transferInterval: 0.5,   // s/ball, robot-to-shield ground transfer

@@ -167,6 +167,7 @@ export function createScheduler(world) {
       expelTimer: 0,
       headingDx: 0,
       headingDz: 1,
+      headingAngle: 0,   // current visual heading in radians (Three.js rotation.y)
     };
   }
 
@@ -278,6 +279,7 @@ export function createScheduler(world) {
         s.expelTimer = 0;
         s.headingDx = 0;
         s.headingDz = 1;
+        s.headingAngle = 0;
         setRobotPosition(r, p.x, 0, p.z);
         setRobotHeading(r, 0, 1);
         setCarryCount(r, 0);
@@ -538,6 +540,23 @@ export function createScheduler(world) {
     return OTHERS;
   }
 
+  // Gradually rotate a robot's visual heading toward its desired direction
+  // (s.headingDx/Dz) at PARAMS.turnSpeed °/s. Updates s.headingAngle and
+  // sets robot.group.rotation.y. No-ops when the desired direction is ~zero.
+  function stepHeading(s, robot, dt) {
+    const dx = s.headingDx;
+    const dz = s.headingDz;
+    if (Math.hypot(dx, dz) < 1e-4) return;
+    const targetAngle = Math.atan2(dx, dz);
+    const maxStep = PARAMS.turnSpeed * (Math.PI / 180) * dt;
+    let diff = targetAngle - s.headingAngle;
+    // Wrap to shortest arc [-π, π]
+    while (diff >  Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    s.headingAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxStep);
+    robot.group.rotation.y = s.headingAngle;
+  }
+
   function driveToward(s, targetX, targetZ, dt) {
     const dx = targetX - s.pos.x;
     const dz = targetZ - s.pos.z;
@@ -592,7 +611,7 @@ export function createScheduler(world) {
         }
       }
       setRobotPosition(robot, s.pos.x, 0, s.pos.z);
-      setRobotHeading(robot, s.headingDx, s.headingDz);
+      stepHeading(s, robot, dt);
       setCarryCount(robot, 0);
       pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, -1);
       return;
@@ -686,7 +705,7 @@ export function createScheduler(world) {
     }
 
     setRobotPosition(robot, s.pos.x, 0, s.pos.z);
-    setRobotHeading(robot, s.headingDx, s.headingDz);
+    stepHeading(s, robot, dt);
     setCarryCount(robot, s.carry);
     pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, s.targetBallIdx);
   }
@@ -761,7 +780,7 @@ export function createScheduler(world) {
             const target = climbApproachTargets[allianceKey][i];
             driveToward(rs, target.x, target.z, dt);
             setRobotPosition(r, rs.pos.x, 0, rs.pos.z);
-            setRobotHeading(r, rs.headingDx, rs.headingDz);
+            stepHeading(rs, r, dt);
             setCarryCount(r, 0);
             pushBallsFromRobot(wildfire.balls, rs.pos.x, rs.pos.z, -1);
           }

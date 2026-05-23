@@ -148,6 +148,7 @@ camSelect.addEventListener('change', () => applyCam(camSelect.value));
 // ---------- Configurator wiring ----------
 const SLIDER_KEYS = [
   ['driveSpeed', (v) => v.toFixed(1)],
+  ['turnSpeed', (v) => String(v|0)],
   ['capacity', (v) => String(v|0)],
   ['shootInterval', (v) => v.toFixed(1)],
   ['transferInterval', (v) => v.toFixed(2)],
