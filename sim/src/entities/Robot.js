@@ -1,32 +1,21 @@
 import * as THREE from 'three';
 import { ROBOT, COLORS } from '../field/dims.js';
-import { makeCountSprite, paintCountBadge } from '../ui/badge.js';
 
-// Robot = 50x50x50 cm chassis + small front intake + label sprite.
-
-function makeLabelSprite(text, color) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128; canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, 128, 64);
-  ctx.font = 'bold 42px Segoe UI, sans-serif';
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 64, 32);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = THREE.LinearFilter;
-  return new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
-}
+// Robot = 50x50x50 cm chassis + small front intake + a single combined
+// info-badge sprite (role ● label ● count in one element).
 
 // Role colours and letter map.
 const ROLE_COLOR = { supp: '#40c080', shield: '#f0b840', fault: '#e8394a' };
 const ROLE_LETTER = { supp: 'S', shield: 'H', fault: 'F' };
 
-function makeRoleSprite() {
+// ── Combined info badge ────────────────────────────────────────────────────
+// Canvas layout (256 × 64 px, 4:1 aspect):
+//   [ 0-64 ] role circle  •  [ 64-192 ] label text  •  [ 192-256 ] count circle
+// The count section is only painted when count > 0; otherwise it stays blank.
+
+function makeInfoBadge() {
   const canvas = document.createElement('canvas');
-  canvas.width = 64; canvas.height = 64;
+  canvas.width = 256; canvas.height = 64;
   const ctx = canvas.getContext('2d');
   const tex = new THREE.CanvasTexture(canvas);
   tex.minFilter = THREE.LinearFilter;
@@ -37,30 +26,70 @@ function makeRoleSprite() {
   return { sprite, canvas, ctx, tex };
 }
 
-function paintRole(badge, role) {
+function paintInfoBadge(badge, label, role, count, allianceColor) {
   const { canvas, ctx, tex } = badge;
-  const color = ROLE_COLOR[role] ?? '#888';
-  const letter = ROLE_LETTER[role] ?? '?';
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const W = canvas.width;   // 256
+  const H = canvas.height;  // 64
+  const roleColor  = ROLE_COLOR[role]   ?? '#888';
+  const roleLetter = ROLE_LETTER[role]  ?? '?';
+  const allianceCss = allianceColor === 'red' ? '#a02030' : '#204fa0';
+  const goldColor   = '#' + COLORS.gold.toString(16).padStart(6, '0');
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background pill
+  const r = 14;
   ctx.beginPath();
-  ctx.arc(32, 32, 26, 0, Math.PI * 2);
+  ctx.roundRect(2, 4, W - 4, H - 8, r);
   ctx.fillStyle = 'rgba(10,10,18,0.88)';
   ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = allianceCss;
   ctx.stroke();
-  ctx.font = 'bold 30px Segoe UI, sans-serif';
-  ctx.fillStyle = color;
+
+  // ── Role circle (left section, cx=32) ────────────────────────────────
+  ctx.beginPath();
+  ctx.arc(32, H / 2, 22, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(10,10,18,0.6)';
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = roleColor;
+  ctx.stroke();
+  ctx.font = 'bold 26px Segoe UI, sans-serif';
+  ctx.fillStyle = roleColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(letter, 32, 34);
+  ctx.fillText(roleLetter, 32, H / 2 + 1);
+
+  // ── Label text (centre section, cx=128) ──────────────────────────────
+  ctx.font = 'bold 36px Segoe UI, sans-serif';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, 128, H / 2 + 1);
+
+  // ── Count circle (right section, cx=224) — only when carrying ────────
+  if (count > 0) {
+    ctx.beginPath();
+    ctx.arc(224, H / 2, 22, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(10,10,18,0.6)';
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = goldColor;
+    ctx.stroke();
+    ctx.font = 'bold 28px Segoe UI, sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(count), 224, H / 2 + 1);
+  }
+
   tex.needsUpdate = true;
 }
 
 export function makeRobot(label, allianceColor) {
   const colorHex = allianceColor === 'red' ? COLORS.red : COLORS.blue;
   const dimHex = allianceColor === 'red' ? COLORS.redDim : COLORS.blueDim;
-  const colorCssRgb = allianceColor === 'red' ? '#a02030' : '#204fa0';
   const g = new THREE.Group();
 
   // Chassis
@@ -88,7 +117,6 @@ export function makeRobot(label, allianceColor) {
   stripe.position.y = ROBOT.size * 0.55;
   g.add(stripe);
 
-
   // Climb hook (visible top mast for the anchor)
   const mast = new THREE.Mesh(
     new THREE.BoxGeometry(0.06, 0.5, 0.06),
@@ -98,33 +126,24 @@ export function makeRobot(label, allianceColor) {
   mast.visible = false; // only the anchor robot shows it
   g.add(mast);
 
-  // Label sprite
-  const sprite = makeLabelSprite(label, colorCssRgb);
-  sprite.scale.set(0.35, 0.18, 1);
-  sprite.position.set(0, ROBOT.size + 0.3, 0);
-  g.add(sprite);
-
-  // Numeric carry-count badge above the label.
-  const countBadge = makeCountSprite();
-  countBadge.sprite.scale.set(0.22, 0.22, 1);
-  countBadge.sprite.position.set(0, ROBOT.size + 0.62, 0);
-  countBadge.sprite.visible = false;
-  paintCountBadge(countBadge, 0);
-  g.add(countBadge.sprite);
-
-  // Role indicator badge (S/H/F) — to the left of the label.
-  const roleBadge = makeRoleSprite();
-  roleBadge.sprite.scale.set(0.20, 0.20, 1);
-  roleBadge.sprite.position.set(-0.28, ROBOT.size + 0.30, 0);
-  paintRole(roleBadge, 'supp');
-  g.add(roleBadge.sprite);
+  // Combined info badge: [role●] [label] [count] — single sprite for all 3.
+  // Canvas 256×64 → 4:1 aspect; scale (0.72, 0.18) → ~72 cm × 18 cm in world.
+  const infoBadge = makeInfoBadge();
+  infoBadge.sprite.scale.set(0.72, 0.18, 1);
+  infoBadge.sprite.position.set(0, ROBOT.size + 0.42, 0);
+  paintInfoBadge(infoBadge, label, 'supp', 0, allianceColor);
+  g.add(infoBadge.sprite);
 
   return {
     group: g,
     chassis,
     mast,
-    countBadge,
-    roleBadge,
+    infoBadge,
+    // Store display state so repaints can redraw the full badge.
+    _label: label,
+    _role: 'supp',
+    _count: 0,
+    _alliance: allianceColor,
     label,
     alliance: allianceColor,
     climbZone: null,
@@ -134,12 +153,9 @@ export function makeRobot(label, allianceColor) {
 }
 
 export function setCarryCount(robot, n) {
-  if (n > 0) {
-    robot.countBadge.sprite.visible = true;
-    paintCountBadge(robot.countBadge, n);
-  } else {
-    robot.countBadge.sprite.visible = false;
-  }
+  if (robot._count === n) return;
+  robot._count = n;
+  paintInfoBadge(robot.infoBadge, robot._label, robot._role, n, robot._alliance);
 }
 
 export function setRobotPosition(robot, x, y, z) {
@@ -160,5 +176,7 @@ export function setAnchor(robot, isAnchor) {
 }
 
 export function setRobotRole(robot, role) {
-  paintRole(robot.roleBadge, role);
+  if (robot._role === role) return;
+  robot._role = role;
+  paintInfoBadge(robot.infoBadge, robot._label, role, robot._count, robot._alliance);
 }

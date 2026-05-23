@@ -168,6 +168,7 @@ export function createScheduler(world) {
       headingDx: 0,
       headingDz: 1,
       headingAngle: 0,   // current visual heading in radians (Three.js rotation.y)
+      reversing: false,  // hysteresis flag for non-holonomic forward/reverse mode
     };
   }
 
@@ -280,6 +281,7 @@ export function createScheduler(world) {
         s.headingDx = 0;
         s.headingDz = 1;
         s.headingAngle = 0;
+        s.reversing = false;
         setRobotPosition(r, p.x, 0, p.z);
         setRobotHeading(r, 0, 1);
         setCarryCount(r, 0);
@@ -549,12 +551,22 @@ export function createScheduler(world) {
   // Non-holonomic drive: robots can only move forward or backward along the
   // direction they are facing. Each tick:
   //   1. Ask steer() for the avoidance-adjusted target direction.
-  //   2. Decide forward vs. reverse — backing up is cheaper when the target
-  //      is in the rear hemisphere (saves up to 90° of turning vs. swinging
-  //      all the way around to face it).
-  //   3. Rotate headingAngle toward the effective target at PARAMS.turnSpeed.
-  //   4. Translate strictly along the current heading (forward or backward).
-  // Turning and driving happen simultaneously every tick.
+  //   2. Decide forward vs. reverse using the RAW angle to the goal (not the
+  //      steer-adjusted angle) with a ±20° hysteresis band (enter reverse
+  //      above 110°, exit below 70°). Raw-angle mode prevents steering noise
+  //      from flipping the mode every frame near the 90° boundary.
+  //   3. Rotate headingAngle toward the steer-adjusted effective target at
+  //      PARAMS.turnSpeed (forward = face steer direction; reverse = face
+  //      steer direction + 180° so the back faces the goal).
+  //   4. Scale drive speed by cos(turnDiff) — proportional velocity control.
+  //      This eliminates overshoot / orbit: the robot moves fastest when
+  //      already aligned and decelerates to 0 when perpendicular to its goal,
+  //      so it never drives past the target while still turning to face it.
+
+  // Hysteresis thresholds for forward ↔ reverse mode (in radians).
+  const ENTER_REVERSE = (110 / 180) * Math.PI;
+  const EXIT_REVERSE  = (70  / 180) * Math.PI;
+
   function driveToward(s, targetX, targetZ, dt) {
     const dx = targetX - s.pos.x;
     const dz = targetZ - s.pos.z;
@@ -562,42 +574,53 @@ export function createScheduler(world) {
     const speed = PARAMS.driveSpeed;
     const maxStep = speed * dt;
 
-    // Snap when within one frame of the target.
+    // Snap when close enough that one frame of driving would overshoot.
     if (dist <= maxStep + 0.01) {
       s.pos.x = targetX;
       s.pos.z = targetZ;
       return true;
     }
 
-    // Compute avoidance-adjusted velocity and extract its heading angle.
+    // Compute avoidance-adjusted velocity for turning.
     TMP_V.set((dx / dist) * speed, 0, (dz / dist) * speed);
     const v = steer(s.pos.x, s.pos.z, TMP_V, gatherOthers(s));
     const vm = Math.hypot(v.x, v.z);
     if (vm < 1e-6) return false;
-    const targetAngle = Math.atan2(v.x, v.z);
+    const steerAngle = Math.atan2(v.x, v.z);
 
-    // Shortest-arc diff from current heading to desired direction.
-    let diff = targetAngle - s.headingAngle;
-    while (diff >  Math.PI) diff -= 2 * Math.PI;
-    while (diff < -Math.PI) diff += 2 * Math.PI;
+    // Forward/reverse mode — based on RAW goal angle so steering noise can't
+    // flip the mode on every frame when the robot is broadside to its target.
+    const rawAngle = Math.atan2(dx, dz);
+    let rawDiff = rawAngle - s.headingAngle;
+    while (rawDiff >  Math.PI) rawDiff -= 2 * Math.PI;
+    while (rawDiff < -Math.PI) rawDiff += 2 * Math.PI;
+    if (s.reversing) {
+      if (Math.abs(rawDiff) < EXIT_REVERSE)  s.reversing = false;
+    } else {
+      if (Math.abs(rawDiff) > ENTER_REVERSE) s.reversing = true;
+    }
 
-    // Target is in the rear hemisphere → back up. The effective turn target
-    // is the heading that puts the robot's *back* toward the destination, so
-    // the robot only needs to turn (|diff| - 90°) instead of (180° - |diff|).
-    const reverse = Math.abs(diff) > Math.PI / 2;
-    const effectiveAngle = reverse ? targetAngle + Math.PI : targetAngle;
+    // Effective turn target: face steer direction (forward) or steer+180°
+    // (reverse — robot backs toward the goal).
+    const effectiveAngle = s.reversing ? steerAngle + Math.PI : steerAngle;
 
-    // Rotate heading toward the effective target angle at PARAMS.turnSpeed.
+    // Rotate heading toward the effective target at PARAMS.turnSpeed.
     let turnDiff = effectiveAngle - s.headingAngle;
     while (turnDiff >  Math.PI) turnDiff -= 2 * Math.PI;
     while (turnDiff < -Math.PI) turnDiff += 2 * Math.PI;
     const maxTurn = PARAMS.turnSpeed * (Math.PI / 180) * dt;
     s.headingAngle += Math.sign(turnDiff) * Math.min(Math.abs(turnDiff), maxTurn);
 
+    // Proportional velocity: scale drive speed by cos(turnDiff) so the robot
+    // decelerates to 0 when perpendicular to its goal.  This prevents the
+    // robot from overshooting / orbiting the target while still turning to
+    // face it — the classic non-holonomic pathfinding fix.
+    const driveScale = Math.max(0, Math.cos(turnDiff));
+
     // Translate along the current heading — forward, or backward when reversing.
-    const fwd = reverse ? -1 : 1;
-    s.pos.x += Math.sin(s.headingAngle) * maxStep * fwd;
-    s.pos.z += Math.cos(s.headingAngle) * maxStep * fwd;
+    const fwd = s.reversing ? -1 : 1;
+    s.pos.x += Math.sin(s.headingAngle) * maxStep * driveScale * fwd;
+    s.pos.z += Math.cos(s.headingAngle) * maxStep * driveScale * fwd;
 
     // Keep headingDx/Dz consistent with headingAngle for external consumers.
     s.headingDx = Math.sin(s.headingAngle);
