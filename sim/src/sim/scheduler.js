@@ -540,46 +540,69 @@ export function createScheduler(world) {
     return OTHERS;
   }
 
-  // Gradually rotate a robot's visual heading toward its desired direction
-  // (s.headingDx/Dz) at PARAMS.turnSpeed °/s. Updates s.headingAngle and
-  // sets robot.group.rotation.y. No-ops when the desired direction is ~zero.
-  function stepHeading(s, robot, dt) {
-    const dx = s.headingDx;
-    const dz = s.headingDz;
-    if (Math.hypot(dx, dz) < 1e-4) return;
-    const targetAngle = Math.atan2(dx, dz);
-    const maxStep = PARAMS.turnSpeed * (Math.PI / 180) * dt;
-    let diff = targetAngle - s.headingAngle;
-    // Wrap to shortest arc [-π, π]
-    while (diff >  Math.PI) diff -= 2 * Math.PI;
-    while (diff < -Math.PI) diff += 2 * Math.PI;
-    s.headingAngle += Math.sign(diff) * Math.min(Math.abs(diff), maxStep);
+  // Apply the robot's current heading angle to its Three.js group rotation.
+  // Turning is handled inside driveToward; this just syncs the visual.
+  function stepHeading(s, robot) {
     robot.group.rotation.y = s.headingAngle;
   }
 
+  // Non-holonomic drive: robots can only move forward or backward along the
+  // direction they are facing. Each tick:
+  //   1. Ask steer() for the avoidance-adjusted target direction.
+  //   2. Decide forward vs. reverse — backing up is cheaper when the target
+  //      is in the rear hemisphere (saves up to 90° of turning vs. swinging
+  //      all the way around to face it).
+  //   3. Rotate headingAngle toward the effective target at PARAMS.turnSpeed.
+  //   4. Translate strictly along the current heading (forward or backward).
+  // Turning and driving happen simultaneously every tick.
   function driveToward(s, targetX, targetZ, dt) {
     const dx = targetX - s.pos.x;
     const dz = targetZ - s.pos.z;
     const dist = Math.hypot(dx, dz);
     const speed = PARAMS.driveSpeed;
     const maxStep = speed * dt;
-    // Snap when within one frame of the target. Bypasses any steering noise
-    // that would otherwise leave the robot oscillating just shy of its goal.
+
+    // Snap when within one frame of the target.
     if (dist <= maxStep + 0.01) {
       s.pos.x = targetX;
       s.pos.z = targetZ;
       return true;
     }
-    // Record heading (to target) before steering deflects the velocity.
-    s.headingDx = dx / dist;
-    s.headingDz = dz / dist;
-    const vx = (dx / dist) * speed;
-    const vz = (dz / dist) * speed;
-    TMP_V.set(vx, 0, vz);
+
+    // Compute avoidance-adjusted velocity and extract its heading angle.
+    TMP_V.set((dx / dist) * speed, 0, (dz / dist) * speed);
     const v = steer(s.pos.x, s.pos.z, TMP_V, gatherOthers(s));
-    const vm = Math.hypot(v.x, v.z) || 1;
-    s.pos.x += (v.x / vm) * maxStep;
-    s.pos.z += (v.z / vm) * maxStep;
+    const vm = Math.hypot(v.x, v.z);
+    if (vm < 1e-6) return false;
+    const targetAngle = Math.atan2(v.x, v.z);
+
+    // Shortest-arc diff from current heading to desired direction.
+    let diff = targetAngle - s.headingAngle;
+    while (diff >  Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+
+    // Target is in the rear hemisphere → back up. The effective turn target
+    // is the heading that puts the robot's *back* toward the destination, so
+    // the robot only needs to turn (|diff| - 90°) instead of (180° - |diff|).
+    const reverse = Math.abs(diff) > Math.PI / 2;
+    const effectiveAngle = reverse ? targetAngle + Math.PI : targetAngle;
+
+    // Rotate heading toward the effective target angle at PARAMS.turnSpeed.
+    let turnDiff = effectiveAngle - s.headingAngle;
+    while (turnDiff >  Math.PI) turnDiff -= 2 * Math.PI;
+    while (turnDiff < -Math.PI) turnDiff += 2 * Math.PI;
+    const maxTurn = PARAMS.turnSpeed * (Math.PI / 180) * dt;
+    s.headingAngle += Math.sign(turnDiff) * Math.min(Math.abs(turnDiff), maxTurn);
+
+    // Translate along the current heading — forward, or backward when reversing.
+    const fwd = reverse ? -1 : 1;
+    s.pos.x += Math.sin(s.headingAngle) * maxStep * fwd;
+    s.pos.z += Math.cos(s.headingAngle) * maxStep * fwd;
+
+    // Keep headingDx/Dz consistent with headingAngle for external consumers.
+    s.headingDx = Math.sin(s.headingAngle);
+    s.headingDz = Math.cos(s.headingAngle);
+
     return false;
   }
 
@@ -611,7 +634,7 @@ export function createScheduler(world) {
         }
       }
       setRobotPosition(robot, s.pos.x, 0, s.pos.z);
-      stepHeading(s, robot, dt);
+      stepHeading(s, robot);
       setCarryCount(robot, 0);
       pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, -1);
       return;
@@ -705,7 +728,7 @@ export function createScheduler(world) {
     }
 
     setRobotPosition(robot, s.pos.x, 0, s.pos.z);
-    stepHeading(s, robot, dt);
+    stepHeading(s, robot);
     setCarryCount(robot, s.carry);
     pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, s.targetBallIdx);
   }
@@ -780,7 +803,7 @@ export function createScheduler(world) {
             const target = climbApproachTargets[allianceKey][i];
             driveToward(rs, target.x, target.z, dt);
             setRobotPosition(r, rs.pos.x, 0, rs.pos.z);
-            stepHeading(rs, r, dt);
+            stepHeading(rs, r);
             setCarryCount(r, 0);
             pushBallsFromRobot(wildfire.balls, rs.pos.x, rs.pos.z, -1);
           }
