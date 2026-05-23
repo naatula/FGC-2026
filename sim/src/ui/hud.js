@@ -58,6 +58,8 @@ export function updateHud(state, t, totalSec, world) {
   $('red-coop').textContent = scores.coop;
   $('blue-coop').textContent = scores.coop;
   $('ext-count').textContent = state.ext;
+  if ($('red-ext'))  $('red-ext').textContent  = state.ext;
+  if ($('blue-ext')) $('blue-ext').textContent = state.ext;
   if ($('queue-red'))  $('queue-red').textContent  = state.shieldQueueRed  ?? 0;
   if ($('queue-blue')) $('queue-blue').textContent = state.shieldQueueBlue ?? 0;
 

@@ -3,9 +3,13 @@
 // regional_score = ceil(
 //   suppression_balls × climb_multiplier
 //   + partner_climbs × 25
-//   + extinguisher_balls
-//   + coopertition_bonus
-// )
+//   + extinguisher_balls        ← shared game element: BOTH alliances score
+//   + coopertition_bonus        ←   the same count from the single central
+// )                               Extinguisher; it is cooperative, not competitive.
+//
+// state.ext is therefore a single counter shared by both regionalScore calls.
+// This is intentional — both alliances' human players throw into the same
+// Extinguisher, and both benefit equally from its fill.
 
 const ZONE_INCREMENTS = {
   '—': 0,

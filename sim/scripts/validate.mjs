@@ -20,7 +20,7 @@ const src = (p) => path.resolve(here, '../src', p);
 
 const { computeScores, climbMultiplier, coopertitionBonus, regionalScore } =
   await import(src('sim/scoring.js'));
-const { CLIMB, Z_MID, planTrips, getPhaseName } =
+const { CLIMB, Z_MID, getPhaseName, SCORING_END, CLIMB_WALK_END, HOLD_START } =
   await import(src('sim/timeline.js'));
 
 let passed = 0;
@@ -54,7 +54,7 @@ check(`blue score = ${expectedRed}`,        s.blue === expectedRed);
 
 console.log('\n== Climb timeline structure ==');
 check('CLIMB.unit is array', Array.isArray(CLIMB.unit));
-check('CLIMB.unit starts onGround=true at t=113', CLIMB.unit[0].onGround === true && CLIMB.unit[0].t === 113);
+check('CLIMB.unit starts onGround=true at t=SCORING_END', CLIMB.unit[0].onGround === true && CLIMB.unit[0].t === SCORING_END);
 check('CLIMB.unit ends at t=150, frac=Z_MID.z3', CLIMB.unit[CLIMB.unit.length-1].t === 150 && CLIMB.unit[CLIMB.unit.length-1].frac === Z_MID.z3);
 let monotonicT = true, monotonicFrac = true;
 for (let i = 1; i < CLIMB.unit.length; i++) {
@@ -88,27 +88,19 @@ function interpFrac(t) {
   return { frac: 0, onGround: true };
 }
 const probes = [
-  { t: 113.5, expect: 'Contact' },  // walk-to-base
-  { t: 126.5, expect: 'Contact' },  // positioning delay (before lift-off at 127.5)
-  { t: 131,   expect: 'Z1' },       // +10s delay from original t=121
-  { t: 134,   expect: 'Z2' },       // +10s delay from original t=124
-  { t: 138,   expect: 'Z3' },       // +10s delay from original t=128
-  { t: 140,   expect: 'Z3' },
-  { t: 150,   expect: 'Z3' },
+  { t: SCORING_END + 0.5,    expect: 'Contact' },  // walk-to-base
+  { t: CLIMB_WALK_END + 0.5, expect: 'Contact' },  // hook on, before lift-off at 127.5
+  { t: 131,                  expect: 'Z1' },
+  { t: 134,                  expect: 'Z2' },
+  { t: HOLD_START - 1,       expect: 'Z3' },        // one second before Z3 hold
+  { t: HOLD_START + 1,       expect: 'Z3' },        // one second into Z3 hold
+  { t: 150,                  expect: 'Z3' },
 ];
 for (const p of probes) {
   const { frac, onGround } = interpFrac(p.t);
   const z = zoneAtFrac(frac, onGround);
   check(`t=${p.t}: zone=${z} (expected ${p.expect})`, z === p.expect);
 }
-
-console.log('\n== Trip planning ==');
-const rtrips = planTrips(1.0, 113, 'red', 0);
-check('plan produces 15–35 trips per robot', rtrips.length >= 15 && rtrips.length <= 35);
-check('all trips have dest supp|shield', rtrips.every(t => t.dest === 'supp' || t.dest === 'shield'));
-const shieldCount = rtrips.filter(t => t.dest === 'shield').length;
-const shieldFrac = shieldCount / rtrips.length;
-check(`shield trips ~1/6 (got ${shieldFrac.toFixed(2)})`, shieldFrac > 0.10 && shieldFrac < 0.25);
 
 console.log('\n== Swim lane geometry (red) ==');
 // Re-derive lane rectangles the same way scheduler.buildLanes does so we
@@ -160,9 +152,9 @@ check('R1–R2 score ≥ ROBOT.size (0.50)', dist(score1, score2) >= 0.50);
 console.log('\n== Phases ==');
 check('phase at t=0   = Rush',        getPhaseName(0)   === 'Rush');
 check('phase at t=30  = Sustained Scoring', getPhaseName(30)  === 'Sustained Scoring');
-check('phase at t=113 = Positioning', getPhaseName(113) === 'Positioning');
-check('phase at t=126 = Climb',       getPhaseName(126) === 'Climb');
-check('phase at t=139 = Hold',        getPhaseName(139) === 'Hold');
+check('phase at t=SCORING_END = Positioning',    getPhaseName(SCORING_END)    === 'Positioning');
+check('phase at t=CLIMB_WALK_END = Climb',      getPhaseName(CLIMB_WALK_END) === 'Climb');
+check('phase at t=HOLD_START = Hold',            getPhaseName(HOLD_START)     === 'Hold');
 
 console.log(`\n${passed} passed, ${failed} failed.`);
 process.exit(failed === 0 ? 0 : 1);

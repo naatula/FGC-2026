@@ -3,10 +3,10 @@ import {
   WILDFIRE, FIELD, ROBOT,
   SUPPRESSION, EXTINGUISHER, BRACE,
 } from '../field/dims.js';
-import { CLIMB, getPhaseName } from './timeline.js';
+import { CLIMB, getPhaseName, SCORING_END, CLIMB_WALK_END } from './timeline.js';
 import { pointOnBrace } from '../field/buildBrace.js';
 import {
-  setRobotPosition, setRobotCarrying, setAnchor, setCarryCount,
+  setRobotPosition, setAnchor, setCarryCount,
 } from '../entities/Robot.js';
 import { setGateOpen } from '../field/buildFireShield.js';
 import { updateMissPileFill } from '../field/buildMissPiles.js';
@@ -19,8 +19,6 @@ import { pushBallsFromRobot, stepBallPhysics } from './ballPhysics.js';
 // reads its tuning from PARAMS each tick, and integrates motion with the
 // real frame dt. Climb / human-throw flows live alongside.
 
-const SCORING_END = 113.0;
-const CLIMB_WALK_END = 126.0;
 
 const LANE_FLANK_X = 0.40;
 const LANE_FLANK_Z = 0.55;
@@ -167,14 +165,13 @@ export function createScheduler(world) {
       targetBallIdx: -1,
       pickupTimer: 0,
       expelTimer: 0,
-      stuckTimer: 0,
     };
   }
 
   const state = {
     suppRed: 0,
     suppBlue: 0,
-    ext: 0,
+    ext: 0,            // shared by both alliances (one central Extinguisher)
     missRed: 0,
     missBlue: 0,
     climbZones: { red: ['—','—','—'], blue: ['—','—','—'] },
@@ -277,9 +274,7 @@ export function createScheduler(world) {
         s.targetBallIdx = -1;
         s.pickupTimer = 0;
         s.expelTimer = 0;
-        s.stuckTimer = 0;
         setRobotPosition(r, p.x, 0, p.z);
-        setRobotCarrying(r, false);
         setCarryCount(r, 0);
       }
     }
@@ -590,7 +585,6 @@ export function createScheduler(world) {
       }
       setRobotPosition(robot, s.pos.x, 0, s.pos.z);
       setCarryCount(robot, 0);
-      setRobotCarrying(robot, false);
       pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, -1);
       return;
     }
@@ -684,7 +678,6 @@ export function createScheduler(world) {
 
     setRobotPosition(robot, s.pos.x, 0, s.pos.z);
     setCarryCount(robot, s.carry);
-    setRobotCarrying(robot, false);
     pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, s.targetBallIdx);
   }
 
@@ -757,7 +750,6 @@ export function createScheduler(world) {
             const target = climbApproachTargets[allianceKey][i];
             driveToward(robotStates[allianceKey][i], target.x, target.z, dt);
             setRobotPosition(r, robotStates[allianceKey][i].pos.x, 0, robotStates[allianceKey][i].pos.z);
-            setRobotCarrying(r, false);
             setCarryCount(r, 0);
             pushBallsFromRobot(wildfire.balls, robotStates[allianceKey][i].pos.x, robotStates[allianceKey][i].pos.z, -1);
           }
@@ -783,7 +775,6 @@ export function createScheduler(world) {
             px = Math.max(-fieldEdge, Math.min(fieldEdge, px));
             pz = Math.max(-fieldEdge, Math.min(fieldEdge, pz));
             setRobotPosition(partners[pi], px, py, pz);
-            setRobotCarrying(partners[pi], false);
             setCarryCount(partners[pi], 0);
           }
 

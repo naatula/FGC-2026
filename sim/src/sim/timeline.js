@@ -1,14 +1,19 @@
 import { MATCH, BRACE } from '../field/dims.js';
 
+// Key match time boundaries (seconds). Exported so scheduler.js and validate.mjs
+// can import them directly — no more hand-duplicated magic numbers.
+export const SCORING_END   = 113.0; // robots stop scoring, begin walk to brace
+export const CLIMB_WALK_END = 126.0; // walk ends, hook grips brace, liftoff at 127.5
+export const HOLD_START     = 139.0; // Z3 reached, all robots hold to match end
+
 // Phase boundaries (seconds from match start).
-// These must stay in sync with SCORING_END and CLIMB_WALK_END in scheduler.js,
-// and with the CLIMB.unit keyframes below.
+// Derived from the exported constants above so they never drift.
 export const PHASES = [
-  { at: 0,   name: 'Rush' },              // balls scatter, robots charge immediately
-  { at: 30,  name: 'Sustained Scoring' }, // field thinning, steady cycle continues
-  { at: 113, name: 'Positioning' },       // SCORING_END: scoring stops, walk to brace
-  { at: 126, name: 'Climb' },             // CLIMB_WALK_END: hook on, liftoff at 127.5
-  { at: 139, name: 'Hold' },              // Z3 reached, all robots hold to match end
+  { at: 0,              name: 'Rush' },              // balls scatter, robots charge
+  { at: 30,             name: 'Sustained Scoring' }, // field thinning, steady cycle
+  { at: SCORING_END,    name: 'Positioning' },       // scoring stops, walk to brace
+  { at: CLIMB_WALK_END, name: 'Climb' },             // hook on, liftoff at 127.5
+  { at: HOLD_START,     name: 'Hold' },              // Z3 reached, hold to match end
 ];
 
 export function getPhaseName(t) {
@@ -17,30 +22,6 @@ export function getPhaseName(t) {
     if (t >= p.at) name = p.name;
   }
   return name;
-}
-
-// Plan a list of scoring trips for one robot. Each trip is:
-//   { t_start, t_at_ball, t_at_score, dest: 'supp'|'shield' }
-//
-// Robots cycle continuously until t_end. Trip duration grows slightly as the
-// field thins out and balls are farther away. We add ~0.8s of slack after each
-// trip to give the projectile arc time to land before the robot starts the
-// next cycle from the goal area.
-export function planTrips(t_start, t_end, alliance, robotIdx) {
-  const trips = [];
-  let t = t_start + robotIdx * 0.25 + (alliance === 'blue' ? 0.15 : 0);
-  let i = 0;
-  while (t < t_end - 4.5) {
-    const phaseFrac = (t - t_start) / (t_end - t_start);
-    const baseDur = 3.5 + phaseFrac * 2.0 + (Math.random() - 0.5) * 0.6;
-    const t_at_ball = t + baseDur * 0.45;
-    const t_at_score = t + baseDur;
-    const dest = (i % 6 === 5) ? 'shield' : 'supp';
-    trips.push({ t_start: t, t_at_ball, t_at_score, dest });
-    t = t_at_score + 0.15;
-    i++;
-  }
-  return trips;
 }
 
 // Climb is a single 3-robot unit. Per manual §3.5, a partner robot "fully

@@ -8,7 +8,8 @@ import {
 //   - 'pending':   not yet released (hidden inside spawn slot)
 //   - 'field':     on the playing field surface, idle
 //   - 'rolling':   moving on the field after being pushed (not targetable)
-//   - 'carried':   attached to a robot (hidden — robot's carryBall is shown)
+//   - 'carried':   held by a robot (hidden; carry count shown via badge)
+//   - 'inShield':  inside the fire-shield queue (hidden)
 //   - 'scored':    deposited in a suppression unit or extinguisher (hidden)
 
 const HIDDEN = new THREE.Vector3(0, -10, 0);
@@ -133,36 +134,3 @@ export function makeWildfire(scene, spawnSlot) {
   return { mesh, balls, update };
 }
 
-// Pick an idle ball that lies closest to `from` and not in the given exclude
-// set. Returns its index or -1.
-export function pickClosestFieldBall(wildfire, from, exclude = new Set()) {
-  let bestIdx = -1;
-  let bestDist = Infinity;
-  for (let i = 0; i < wildfire.balls.length; i++) {
-    const b = wildfire.balls[i];
-    if (b.state !== 'field' || exclude.has(i)) continue;
-    const d = b.pos.distanceToSquared(from);
-    if (d < bestDist) { bestDist = d; bestIdx = i; }
-  }
-  return bestIdx;
-}
-
-// Pick the closest idle ball whose XZ position lies inside the given lane
-// rectangle. `xRange` and `zRange` are [min, max] arrays. Falls back to the
-// unrestricted search when the lane is empty so a robot doesn't stall.
-export function pickClosestFieldBallInZone(
-  wildfire, from, xRange, zRange, exclude = new Set()
-) {
-  let bestIdx = -1;
-  let bestDist = Infinity;
-  for (let i = 0; i < wildfire.balls.length; i++) {
-    const b = wildfire.balls[i];
-    if (b.state !== 'field' || exclude.has(i)) continue;
-    if (b.pos.x < xRange[0] || b.pos.x > xRange[1]) continue;
-    if (b.pos.z < zRange[0] || b.pos.z > zRange[1]) continue;
-    const d = b.pos.distanceToSquared(from);
-    if (d < bestDist) { bestDist = d; bestIdx = i; }
-  }
-  if (bestIdx >= 0) return bestIdx;
-  return pickClosestFieldBall(wildfire, from, exclude);
-}

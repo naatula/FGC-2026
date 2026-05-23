@@ -97,15 +97,6 @@ export function makeRobot(label, allianceColor) {
   sprite.position.set(0, ROBOT.size + 0.3, 0);
   g.add(sprite);
 
-  // Carried ball indicator (single ball mesh; legacy visual)
-  const carryBall = new THREE.Mesh(
-    new THREE.SphereGeometry(0.05, 12, 10),
-    new THREE.MeshStandardMaterial({ color: COLORS.wildfire })
-  );
-  carryBall.position.set(0, ROBOT.size * 0.7 + 0.08, 0.05);
-  carryBall.visible = false;
-  g.add(carryBall);
-
   // Numeric carry-count badge above the label.
   const countBadge = makeCountSprite();
   countBadge.sprite.scale.set(0.22, 0.22, 1);
@@ -118,7 +109,6 @@ export function makeRobot(label, allianceColor) {
     group: g,
     chassis,
     mast,
-    carryBall,
     countBadge,
     label,
     alliance: allianceColor,
@@ -139,10 +129,6 @@ export function setCarryCount(robot, n) {
 
 export function setRobotPosition(robot, x, y, z) {
   robot.group.position.set(x, y, z);
-}
-
-export function setRobotCarrying(robot, carrying) {
-  robot.carryBall.visible = carrying;
 }
 
 export function setAnchor(robot, isAnchor) {
