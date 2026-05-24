@@ -181,6 +181,7 @@
     #side .zone-tag.z2 { background: #46519a; color: #def; }
     #side .zone-tag.z3 { background: var(--gold); color: #111; }
     #side hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
+    #robot-list { max-height: 260px; overflow-y: auto; }
 
     /* Bottom controls */
     #controls {
@@ -266,15 +267,52 @@
       font-weight: 700;
       font-variant-numeric: tabular-nums;
     }
-    #config-panel .role-grid {
+    /* Robot count controls */
+    #config-panel .count-grid {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 4px 8px;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+    #config-panel .count-ctrl {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #config-panel .cnt-btn {
+      background: #1a1a24;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      width: 26px;
+      height: 26px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      line-height: 1;
+      font-family: inherit;
+    }
+    #config-panel .cnt-btn:hover { border-color: var(--gold); }
+    #config-panel .cnt-val {
+      color: var(--gold);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      min-width: 20px;
+      text-align: center;
+    }
+    /* Role grid — rebuilt dynamically by JS */
+    #config-panel #role-grid {
       display: grid;
       grid-template-columns: 32px 1fr 32px 1fr;
       gap: 4px 6px;
       align-items: center;
       margin-top: 4px;
     }
-    #config-panel .role-grid .rk {
-      color: var(--muted);
+    #config-panel #role-grid .rk {
       font-weight: 700;
       text-align: right;
     }
@@ -529,21 +567,24 @@
       <span class="cfg-val" id="cfg-ballFriction-v"></span>
     </div>
     <hr/>
-    <div style="color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;">Roles</div>
-    <div class="role-grid">
-      <span class="rk">R1</span>
-      <select id="role-red-0"><option value="supp">supp</option><option value="shield">shield</option><option value="fault">fault</option></select>
-      <span class="rk">B1</span>
-      <select id="role-blue-0"><option value="supp">supp</option><option value="shield">shield</option><option value="fault">fault</option></select>
-      <span class="rk">R2</span>
-      <select id="role-red-1"><option value="supp">supp</option><option value="shield">shield</option><option value="fault">fault</option></select>
-      <span class="rk">B2</span>
-      <select id="role-blue-1"><option value="supp">supp</option><option value="shield">shield</option><option value="fault">fault</option></select>
-      <span class="rk">R3</span>
-      <select id="role-red-2"><option value="supp">supp</option><option value="shield">shield</option><option value="fault">fault</option></select>
-      <span class="rk">B3</span>
-      <select id="role-blue-2"><option value="supp">supp</option><option value="shield">shield</option><option value="fault">fault</option></select>
+    <div style="color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px;">Robot Count</div>
+    <div class="count-grid">
+      <span class="rk" style="color:var(--red);">Red</span>
+      <div class="count-ctrl">
+        <button class="cnt-btn" id="cnt-red-minus">−</button>
+        <span class="cnt-val" id="cnt-red-val">3</span>
+        <button class="cnt-btn" id="cnt-red-plus">+</button>
+      </div>
+      <span class="rk" style="color:var(--blue);">Blue</span>
+      <div class="count-ctrl">
+        <button class="cnt-btn" id="cnt-blue-minus">−</button>
+        <span class="cnt-val" id="cnt-blue-val">3</span>
+        <button class="cnt-btn" id="cnt-blue-plus">+</button>
+      </div>
     </div>
+    <hr/>
+    <div style="color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;">Roles</div>
+    <div id="role-grid"><!-- populated by JS --></div>
     <button id="cfg-reset" class="cfg-reset">Reset to defaults</button>
   </div>
 

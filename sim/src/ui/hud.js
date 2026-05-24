@@ -7,27 +7,23 @@ import { COLORS } from '../field/dims.js';
 
 const $ = (id) => document.getElementById(id);
 
-const ROBOT_LABELS = {
-  red:  ['R1 (anchor)', 'R2', 'R3'],
-  blue: ['B1 (anchor)', 'B2', 'B3'],
-};
-
 let lastHud = { red: -1, blue: -1, ext: -1, t: -1 };
 
-export function initRobotList() {
+export function initRobotList(countRed = 3, countBlue = 3) {
   const list = $('robot-list');
   list.innerHTML = '';
-  ['red', 'blue'].forEach(alliance => {
-    for (let i = 0; i < 3; i++) {
+  for (const [alliance, count] of [['red', countRed], ['blue', countBlue]]) {
+    for (let i = 0; i < count; i++) {
+      const label = `${alliance === 'red' ? 'R' : 'B'}${i + 1}${i === 0 ? ' (anchor)' : ''}`;
       const row = document.createElement('div');
       row.className = 'row';
       row.innerHTML = `
-        <span><span class="robot-dot ${alliance === 'red' ? 'r' : 'b'}"></span>${ROBOT_LABELS[alliance][i]}</span>
+        <span><span class="robot-dot ${alliance === 'red' ? 'r' : 'b'}"></span>${label}</span>
         <span class="zone-tag" id="zone-${alliance}-${i}">—</span>
       `;
       list.appendChild(row);
     }
-  });
+  }
 }
 
 function formatClock(secLeft) {
@@ -74,11 +70,13 @@ export function updateHud(state, t, totalSec, world) {
   }
   $('z3-count').textContent = `${scores.z3Count} / 6`;
 
-  // Per-robot climb tags
-  ['red', 'blue'].forEach(alliance => {
-    for (let i = 0; i < 3; i++) {
+  // Per-robot climb tags — iterate over actual zone array (length = active count)
+  for (const alliance of ['red', 'blue']) {
+    const zones = state.climbZones[alliance] ?? [];
+    for (let i = 0; i < zones.length; i++) {
       const tag = $(`zone-${alliance}-${i}`);
-      const z = state.climbZones[alliance][i];
+      if (!tag) continue;
+      const z = zones[i];
       tag.textContent = z;
       tag.className = 'zone-tag ' + (
         z === 'Contact' ? 'contact' :
@@ -87,7 +85,7 @@ export function updateHud(state, t, totalSec, world) {
         z === 'Z3' ? 'z3' : ''
       );
     }
-  });
+  }
 
   // Suppression / Extinguisher fill visuals
   if (state.suppRed !== lastHud.red) {
