@@ -167,8 +167,9 @@ export function createScheduler(world) {
       expelTimer: 0,
       headingDx: 0,
       headingDz: 1,
-      headingAngle: 0,   // current visual heading in radians (Three.js rotation.y)
-      reversing: false,  // hysteresis flag for non-holonomic forward/reverse mode
+      headingAngle: 0,      // current visual heading in radians (Three.js rotation.y)
+      reversing: false,     // hysteresis flag for non-holonomic forward/reverse mode
+      approachLocked: false, // heading frozen during final-approach gate
     };
   }
 
@@ -282,6 +283,7 @@ export function createScheduler(world) {
         s.headingDz = 1;
         s.headingAngle = 0;
         s.reversing = false;
+        s.approachLocked = false;
         setRobotPosition(r, p.x, 0, p.z);
         setRobotHeading(r, 0, 1);
         setCarryCount(r, 0);
@@ -548,24 +550,30 @@ export function createScheduler(world) {
     robot.group.rotation.y = s.headingAngle;
   }
 
-  // Non-holonomic drive: robots can only move forward or backward along the
-  // direction they are facing. Each tick:
+  // Non-holonomic drive — two phases:
+  //
+  // LONG RANGE (dist >= NEAR_APPROACH_DIST):
   //   1. Ask steer() for the avoidance-adjusted target direction.
-  //   2. Decide forward vs. reverse using the RAW angle to the goal (not the
-  //      steer-adjusted angle) with a ±20° hysteresis band (enter reverse
-  //      above 110°, exit below 70°). Raw-angle mode prevents steering noise
-  //      from flipping the mode every frame near the 90° boundary.
-  //   3. Rotate headingAngle toward the steer-adjusted effective target at
-  //      PARAMS.turnSpeed (forward = face steer direction; reverse = face
-  //      steer direction + 180° so the back faces the goal).
-  //   4. Scale drive speed by cos(turnDiff) — proportional velocity control.
-  //      This eliminates overshoot / orbit: the robot moves fastest when
-  //      already aligned and decelerates to 0 when perpendicular to its goal,
-  //      so it never drives past the target while still turning to face it.
+  //   2. Decide forward vs. reverse from the RAW goal angle (hysteresis band
+  //      +-20 deg around 90 deg prevents steering noise from flipping the mode).
+  //   3. Rotate headingAngle toward the effective target at PARAMS.turnSpeed.
+  //   4. Scale drive speed by cos(turnDiff) — robot slows to 0 when broadside,
+  //      preventing overshoot while still making lateral progress.
+  //
+  // FINAL-APPROACH GATE (dist < NEAR_APPROACH_DIST):
+  //   steer() is bypassed; the robot turns toward the raw goal angle, which is
+  //   stable because the target does not move while claimed. Once turnDiff
+  //   reaches exactly 0 the heading is LOCKED — rotation stops permanently for
+  //   this run-in. This prevents steer() noise from ever re-triggering
+  //   misalignment (the jitter seen at very low turn speeds). The robot then
+  //   drives straight through at full speed until the snap threshold.
 
-  // Hysteresis thresholds for forward ↔ reverse mode (in radians).
+  // Hysteresis thresholds for forward <-> reverse mode (in radians).
   const ENTER_REVERSE = (110 / 180) * Math.PI;
   const EXIT_REVERSE  = (70  / 180) * Math.PI;
+
+  // Radius at which the final-approach gate activates.
+  const NEAR_APPROACH_DIST = 0.50;
 
   function driveToward(s, targetX, targetZ, dt) {
     const dx = targetX - s.pos.x;
@@ -578,8 +586,39 @@ export function createScheduler(world) {
     if (dist <= maxStep + 0.01) {
       s.pos.x = targetX;
       s.pos.z = targetZ;
+      s.approachLocked = false;
       return true;
     }
+
+    // ---- Final-approach gate ----
+    if (dist < NEAR_APPROACH_DIST) {
+      if (!s.approachLocked) {
+        // Turn only — no translation — using raw goal angle (stable target).
+        const rawAngle = Math.atan2(dx, dz);
+        let turnDiff = rawAngle - s.headingAngle;
+        while (turnDiff >  Math.PI) turnDiff -= 2 * Math.PI;
+        while (turnDiff < -Math.PI) turnDiff += 2 * Math.PI;
+        const maxTurn = PARAMS.turnSpeed * (Math.PI / 180) * dt;
+        s.headingAngle += Math.sign(turnDiff) * Math.min(Math.abs(turnDiff), maxTurn);
+        // After the update, check if exact alignment has been reached.
+        let remaining = rawAngle - s.headingAngle;
+        while (remaining >  Math.PI) remaining -= 2 * Math.PI;
+        while (remaining < -Math.PI) remaining += 2 * Math.PI;
+        if (remaining === 0) s.approachLocked = true;
+      }
+      // Locked (or just became locked this frame): drive straight, heading frozen.
+      if (s.approachLocked) {
+        s.pos.x += Math.sin(s.headingAngle) * maxStep;
+        s.pos.z += Math.cos(s.headingAngle) * maxStep;
+      }
+      s.headingDx = Math.sin(s.headingAngle);
+      s.headingDz = Math.cos(s.headingAngle);
+      return false;
+    }
+
+    // ---- Long-range approach ----
+    // Clear lock if the robot has backed away from the gate (edge case).
+    s.approachLocked = false;
 
     // Compute avoidance-adjusted velocity for turning.
     TMP_V.set((dx / dist) * speed, 0, (dz / dist) * speed);
@@ -600,7 +639,7 @@ export function createScheduler(world) {
       if (Math.abs(rawDiff) > ENTER_REVERSE) s.reversing = true;
     }
 
-    // Effective turn target: face steer direction (forward) or steer+180°
+    // Effective turn target: face steer direction (forward) or steer+180 deg
     // (reverse — robot backs toward the goal).
     const effectiveAngle = s.reversing ? steerAngle + Math.PI : steerAngle;
 
@@ -612,9 +651,7 @@ export function createScheduler(world) {
     s.headingAngle += Math.sign(turnDiff) * Math.min(Math.abs(turnDiff), maxTurn);
 
     // Proportional velocity: scale drive speed by cos(turnDiff) so the robot
-    // decelerates to 0 when perpendicular to its goal.  This prevents the
-    // robot from overshooting / orbiting the target while still turning to
-    // face it — the classic non-holonomic pathfinding fix.
+    // decelerates to 0 when perpendicular to its goal — prevents overshoot.
     const driveScale = Math.max(0, Math.cos(turnDiff));
 
     // Translate along the current heading — forward, or backward when reversing.
@@ -659,6 +696,10 @@ export function createScheduler(world) {
       setRobotPosition(robot, s.pos.x, 0, s.pos.z);
       stepHeading(s, robot);
       setCarryCount(robot, 0);
+      // Pass -1 (no exclusion) intentionally: fault robots push every ball,
+      // including the one they are chasing, so they act as disruptors rather
+      // than collectors. Normal robots pass s.targetBallIdx to exempt their
+      // claimed ball from being knocked away.
       pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, -1);
       return;
     }
@@ -878,7 +919,15 @@ export function createScheduler(world) {
       }
     }
 
-    stepBallPhysics(wildfire.balls, dt);
+    // Collect currently-targeted ball indices so stepBallPhysics can exempt
+    // them from inter-ball collisions.
+    const targeted = new Set();
+    for (const alliance of ['red', 'blue']) {
+      for (const s of robotStates[alliance]) {
+        if (s.targetBallIdx >= 0) targeted.add(s.targetBallIdx);
+      }
+    }
+    stepBallPhysics(wildfire.balls, dt, targeted);
     wildfire.update();
     return state;
   }

@@ -153,7 +153,10 @@ export function pushBallsFromRobot(balls, robotX, robotZ, targetBallIdx) {
 }
 
 // Integrate rolling balls and resolve ball-ball collisions each simulation step.
-export function stepBallPhysics(balls, dt) {
+// `targeted` — optional Set of ball indices currently claimed by a robot that
+// is driving toward them; those balls are exempt from inter-ball collisions so
+// they cannot be knocked away before the robot arrives.
+export function stepBallPhysics(balls, dt, targeted = null) {
   const wall = _half - BALL_R;
 
   // Integrate rolling balls: friction → move → wall bounce → obstacle bounce → rest.
@@ -248,6 +251,9 @@ export function stepBallPhysics(balls, dt) {
           if (j <= i) continue;           // each pair once
           const bj = balls[j];
           if (bj.state !== 'field' && bj.state !== 'rolling') continue;
+          // Skip inter-ball collision if either ball is currently targeted
+          // by a robot — prevents the targeted ball from being knocked away.
+          if (targeted && (targeted.has(i) || targeted.has(j))) continue;
 
           const ddx = bj.pos.x - bi.pos.x;
           const ddz = bj.pos.z - bi.pos.z;
