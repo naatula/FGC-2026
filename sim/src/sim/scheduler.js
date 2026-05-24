@@ -116,27 +116,74 @@ export function createScheduler(world) {
     return false;
   }
 
-  // Like pickClosestFieldBallInZone but skips balls too close to other robots.
-  function pickBallNoConflict(from, xRange, zRange, others) {
-    let bestIdx = -1, bestDist = Infinity;
+  // Estimate the time (seconds) for robot state `s` to drive to (targetX,
+  // targetZ) under the non-holonomic model used by driveToward: the robot
+  // turns toward the goal at PARAMS.turnSpeed while translating at
+  // PARAMS.driveSpeed scaled by cos(turnDiff), and may reverse when the goal
+  // is behind it. This is a side-effect-free forward rollout from a copy of
+  // the robot's pose, so the returned time reflects real turning + driving
+  // dynamics rather than straight-line distance. Steering/avoidance is omitted
+  // (it is a small perturbation and depends on live world state).
+  const DRIVE_SIM_DT = 0.05;   // rollout timestep (s)
+  const DRIVE_SIM_MAX_T = 30;  // safety cap (s)
+  function estimateDriveTime(s, targetX, targetZ) {
+    const v = PARAMS.driveSpeed;
+    const omega = PARAMS.turnSpeed * (Math.PI / 180); // rad/s
+    let x = s.pos.x, z = s.pos.z, heading = s.headingAngle;
+    let t = 0;
+    while (t < DRIVE_SIM_MAX_T) {
+      const dx = targetX - x;
+      const dz = targetZ - z;
+      const dist = Math.hypot(dx, dz);
+      const step = v * DRIVE_SIM_DT;
+      if (dist <= step + 0.01) return t + dist / v;
+
+      const rawAngle = Math.atan2(dx, dz);
+      let rawDiff = rawAngle - heading;
+      while (rawDiff >  Math.PI) rawDiff -= 2 * Math.PI;
+      while (rawDiff < -Math.PI) rawDiff += 2 * Math.PI;
+      // Reverse when the goal is behind the robot — back in instead of turning
+      // all the way around.
+      const reverse = Math.abs(rawDiff) > Math.PI / 2;
+      const effTarget = reverse ? rawAngle + Math.PI : rawAngle;
+      let turnDiff = effTarget - heading;
+      while (turnDiff >  Math.PI) turnDiff -= 2 * Math.PI;
+      while (turnDiff < -Math.PI) turnDiff += 2 * Math.PI;
+      const maxTurn = omega * DRIVE_SIM_DT;
+      heading += Math.sign(turnDiff) * Math.min(Math.abs(turnDiff), maxTurn);
+      const driveScale = Math.max(0, Math.cos(turnDiff));
+      const fwd = reverse ? -1 : 1;
+      x += Math.sin(heading) * step * driveScale * fwd;
+      z += Math.cos(heading) * step * driveScale * fwd;
+      t += DRIVE_SIM_DT;
+    }
+    return t;
+  }
+
+  // Select the reachable ball with the shortest estimated drive time for robot
+  // state `s` (accounting for turning + reverse dynamics), skipping balls
+  // claimed by or too close to other robots. Prefers balls inside the robot's
+  // swim-lane zone; falls back to an unrestricted search if the zone is empty.
+  function pickBallNoConflict(s, xRange, zRange, others) {
+    let bestIdx = -1, bestTime = Infinity;
     for (let i = 0; i < wildfire.balls.length; i++) {
       const b = wildfire.balls[i];
       if (b.state !== 'field' || claimed.has(i)) continue;
       if (b.pos.x < xRange[0] || b.pos.x > xRange[1]) continue;
       if (b.pos.z < zRange[0] || b.pos.z > zRange[1]) continue;
       if (isBallNearOtherRobot(b.pos.x, b.pos.z, others)) continue;
-      const d = b.pos.distanceToSquared(from);
-      if (d < bestDist) { bestDist = d; bestIdx = i; }
+      const t = estimateDriveTime(s, b.pos.x, b.pos.z);
+      if (t < bestTime) { bestTime = t; bestIdx = i; }
     }
     if (bestIdx >= 0) return bestIdx;
     // Fallback: unrestricted search, still filtering conflicts.
-    bestDist = Infinity;
+    bestTime = Infinity;
     for (let i = 0; i < wildfire.balls.length; i++) {
       const b = wildfire.balls[i];
       if (b.state !== 'field' || claimed.has(i)) continue;
       if (isBallNearOtherRobot(b.pos.x, b.pos.z, others)) continue;
-      const d = b.pos.distanceToSquared(from);
-      if (d < bestDist) { bestDist = d; bestIdx = i; }
+      const t = estimateDriveTime(s, b.pos.x, b.pos.z);
+      if (t < bestTime) { bestTime = t; bestIdx = i; }
     }
     return bestIdx;
   }
@@ -678,7 +725,7 @@ export function createScheduler(world) {
       if (s.targetBallIdx === -1) {
         const lane = lanes.swim[s.alliance][s.idx];
         const others = gatherOthers(s);
-        const idx = pickBallNoConflict(s.pos, lane.xRange, lane.zRange, others);
+        const idx = pickBallNoConflict(s, lane.xRange, lane.zRange, others);
         if (idx >= 0) { s.targetBallIdx = idx; claimed.add(idx); }
       } else {
         const b = wildfire.balls[s.targetBallIdx];
@@ -709,7 +756,7 @@ export function createScheduler(world) {
       if (s.targetBallIdx === -1) {
         const lane = lanes.swim[s.alliance][s.idx];
         const others = gatherOthers(s);
-        const idx = pickBallNoConflict(s.pos, lane.xRange, lane.zRange, others);
+        const idx = pickBallNoConflict(s, lane.xRange, lane.zRange, others);
         if (idx >= 0) {
           s.targetBallIdx = idx;
           claimed.add(idx);
