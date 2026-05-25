@@ -10,7 +10,7 @@ import {
 } from '../entities/Robot.js';
 import { setGateOpen } from '../field/buildFireShield.js';
 import { updateMissPileFill } from '../field/buildMissPiles.js';
-import { PARAMS, MAX_ROBOTS } from './config.js';
+import { PARAMS } from './config.js';
 import { buildStaticObstacles, steer } from './steering.js';
 import { pushBallsFromRobot, stepBallPhysics } from './ballPhysics.js';
 
@@ -57,18 +57,18 @@ export function createScheduler(world) {
   setAnchor(anchorBlue, true);
 
   const half = FIELD.size / 2;
-
-  // Generate MAX_ROBOTS start positions per alliance, evenly spaced along the
-  // field edge (z from ≈ -3 to +3, clamped inside field boundary).
-  const startPositions = { red: [], blue: [] };
-  {
-    const zSpan = Math.min((MAX_ROBOTS - 1) * 1.5, FIELD.size - 1.0);
-    for (let i = 0; i < MAX_ROBOTS; i++) {
-      const z = -zSpan / 2 + i * (zSpan / Math.max(1, MAX_ROBOTS - 1));
-      startPositions.red.push( new THREE.Vector3( half - 0.30, 0, z));
-      startPositions.blue.push(new THREE.Vector3(-half + 0.30, 0, z));
-    }
-  }
+  const startPositions = {
+    red: [
+      new THREE.Vector3(half - 0.30, 0, -1.5),
+      new THREE.Vector3(half - 0.30, 0,  0.0),
+      new THREE.Vector3(half - 0.30, 0,  1.5),
+    ],
+    blue: [
+      new THREE.Vector3(-half + 0.30, 0, -1.5),
+      new THREE.Vector3(-half + 0.30, 0,  0.0),
+      new THREE.Vector3(-half + 0.30, 0,  1.5),
+    ],
+  };
 
   // Walk target = XZ projection of the brace at the attach point (NOT the
   // brace's lower end, which is below the chassis). hangBelow is sized so the
@@ -195,10 +195,10 @@ export function createScheduler(world) {
 
   const claimed = new Set();
 
-  // Per-robot runtime state (one entry per slot, up to MAX_ROBOTS).
+  // Per-robot runtime state.
   const robotStates = {
-    red:  Array.from({ length: MAX_ROBOTS }, (_, i) => makeRobotState('red',  i)),
-    blue: Array.from({ length: MAX_ROBOTS }, (_, i) => makeRobotState('blue', i)),
+    red:  robots.red.map((_, i)  => makeRobotState('red',  i)),
+    blue: robots.blue.map((_, i) => makeRobotState('blue', i)),
   };
 
   function makeRobotState(alliance, idx) {
@@ -226,7 +226,7 @@ export function createScheduler(world) {
     ext: 0,            // shared by both alliances (one central Extinguisher)
     missRed: 0,
     missBlue: 0,
-    climbZones: { red: [], blue: [] },  // filled by reset() from PARAMS.robotCount
+    climbZones: { red: ['—','—','—'], blue: ['—','—','—'] },
     partnerClimbs: { red: 0, blue: 0 },
     phase: 'Rush',
     shieldQueueRed: 0,
@@ -270,26 +270,21 @@ export function createScheduler(world) {
 
   function scoreAnchorFor(alliance, idx, role) {
     if (role === 'shield') return fireShields[alliance].approach.clone();
-    // Robots beyond the first 3 cycle through the 3 existing lane positions.
-    return lanes.score[alliance][idx % 3].clone();
+    return lanes.score[alliance][idx].clone();
   }
 
-  const climbApproachTargets = { red: [], blue: [] };
+  const climbApproachTargets = {
+    red: [],
+    blue: [],
+  };
   for (const allianceKey of ['red', 'blue']) {
     const baseXZ = braceBase[allianceKey];
     const perp = bracePerp[allianceKey];
-    for (let i = 0; i < MAX_ROBOTS; i++) {
-      // i=0: anchor directly at base; i=1: +0.55 perp; i=2: -0.55; i=3: +1.10; …
-      const side = (i === 0) ? 0
-        : Math.ceil(i / 2) * 0.55 * (i % 2 === 1 ? 1 : -1);
-      const rawX = baseXZ.x + perp.x * side;
-      const rawZ = baseXZ.z + perp.z * side;
-      climbApproachTargets[allianceKey].push(new THREE.Vector3(
-        Math.max(-half + 0.20, Math.min(half - 0.20, rawX)),
-        0,
-        Math.max(-half + 0.20, Math.min(half - 0.20, rawZ)),
-      ));
-    }
+    climbApproachTargets[allianceKey] = [
+      new THREE.Vector3(baseXZ.x, 0, baseXZ.z),
+      new THREE.Vector3(baseXZ.x + perp.x * 0.55, 0, baseXZ.z + perp.z * 0.55),
+      new THREE.Vector3(baseXZ.x - perp.x * 0.55, 0, baseXZ.z - perp.z * 0.55),
+    ];
   }
 
   const pendingThrows = [];
@@ -300,6 +295,8 @@ export function createScheduler(world) {
     state.ext = 0;
     state.missRed = 0;
     state.missBlue = 0;
+    state.climbZones = { red: ['—','—','—'], blue: ['—','—','—'] };
+    state.partnerClimbs = { red: 0, blue: 0 };
     state.phase = 'Rush';
     state.shieldQueueRed = 0;
     state.shieldQueueBlue = 0;
@@ -319,8 +316,7 @@ export function createScheduler(world) {
     }
 
     for (const alliance of ['red', 'blue']) {
-      const count = PARAMS.robotCount[alliance];
-      for (let i = 0; i < MAX_ROBOTS; i++) {
+      for (let i = 0; i < 3; i++) {
         const r = robots[alliance][i];
         const s = robotStates[alliance][i];
         const p = startPositions[alliance][i];
@@ -335,17 +331,11 @@ export function createScheduler(world) {
         s.headingAngle = 0;
         s.reversing = false;
         s.approachLocked = false;
-        if (i < count) {
-          setRobotPosition(r, p.x, 0, p.z);
-        } else {
-          setRobotPosition(r, 0, -10, 0);  // park below field
-        }
+        setRobotPosition(r, p.x, 0, p.z);
         setRobotHeading(r, 0, 1);
         setCarryCount(r, 0);
       }
-      state.climbZones[alliance] = Array(count).fill('—');
     }
-    state.partnerClimbs = { red: 0, blue: 0 };
     setGateOpen(fireShields.red, false);
     setGateOpen(fireShields.blue, false);
 
@@ -592,8 +582,7 @@ export function createScheduler(world) {
   function gatherOthers(self) {
     OTHERS.length = 0;
     for (const alliance of ['red', 'blue']) {
-      const count = PARAMS.robotCount[alliance];
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < 3; i++) {
         const o = robotStates[alliance][i];
         if (o === self) continue;
         OTHERS.push({ x: o.pos.x, z: o.pos.z });
@@ -734,7 +723,7 @@ export function createScheduler(world) {
       s.phase = 'toPickup';
       s.carry = 0;
       if (s.targetBallIdx === -1) {
-        const lane = lanes.swim[s.alliance][s.idx % 3];
+        const lane = lanes.swim[s.alliance][s.idx];
         const others = gatherOthers(s);
         const idx = pickBallNoConflict(s, lane.xRange, lane.zRange, others);
         if (idx >= 0) { s.targetBallIdx = idx; claimed.add(idx); }
@@ -765,7 +754,7 @@ export function createScheduler(world) {
     if (s.phase === 'toPickup') {
       // Acquire a ball claim if none.
       if (s.targetBallIdx === -1) {
-        const lane = lanes.swim[s.alliance][s.idx % 3];
+        const lane = lanes.swim[s.alliance][s.idx];
         const others = gatherOthers(s);
         const idx = pickBallNoConflict(s, lane.xRange, lane.zRange, others);
         if (idx >= 0) {
@@ -897,21 +886,11 @@ export function createScheduler(world) {
       }
     }
 
-    // Robot state machines — only run for active robots (0..count-1).
+    // Robot state machines
     if (t >= 1.0 && t < SCORING_END) {
       for (const alliance of ['red', 'blue']) {
-        const count = PARAMS.robotCount[alliance];
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < 3; i++) {
           updateRobot(robotStates[alliance][i], dt, t);
-        }
-        // Park inactive robots and release any ball claims they held.
-        for (let i = count; i < MAX_ROBOTS; i++) {
-          const s = robotStates[alliance][i];
-          if (s.targetBallIdx >= 0) {
-            claimed.delete(s.targetBallIdx);
-            s.targetBallIdx = -1;
-          }
-          setRobotPosition(robots[alliance][i], 0, -10, 0);
         }
       }
     }
@@ -924,25 +903,12 @@ export function createScheduler(world) {
     // Climb approach + climb.
     if (t >= SCORING_END) {
       ['red', 'blue'].forEach((allianceKey) => {
-        const count = PARAMS.robotCount[allianceKey];
-
-        // Park inactive robots (they don't climb).
-        for (let i = count; i < MAX_ROBOTS; i++) {
-          setRobotPosition(robots[allianceKey][i], 0, -10, 0);
-        }
-
-        if (count === 0) {
-          state.climbZones[allianceKey] = [];
-          state.partnerClimbs[allianceKey] = 0;
-          return;
-        }
-
         const brace = braces[allianceKey];
         const anchorRobot = robots[allianceKey][0];
+        const partners = [robots[allianceKey][1], robots[allianceKey][2]];
 
         if (t < CLIMB_WALK_END) {
-          // All active robots walk toward their brace approach positions.
-          for (let i = 0; i < count; i++) {
+          for (let i = 0; i < 3; i++) {
             const r = robots[allianceKey][i];
             const rs = robotStates[allianceKey][i];
             const target = climbApproachTargets[allianceKey][i];
@@ -952,16 +918,33 @@ export function createScheduler(world) {
             setCarryCount(r, 0);
             pushBallsFromRobot(wildfire.balls, rs.pos.x, rs.pos.z, -1);
           }
-          state.climbZones[allianceKey] = Array(count).fill('—');
+          state.climbZones[allianceKey] = ['—','—','—'];
           state.partnerClimbs[allianceKey] = 0;
         } else {
           const seg = findSegment(CLIMB.unit, t);
           const frac = lerp(seg.cur.frac, seg.next.frac, easeInOut(seg.k));
           const onGround = seg.cur.onGround;
 
-          // Anchor (idx 0) climbs the brace.
           const anchorPos = pointOnBrace(brace, frac, climbHangBelow);
           setRobotPosition(anchorRobot, anchorPos.x, anchorPos.y, anchorPos.z);
+
+          const perp = bracePerp[allianceKey];
+          const sideMag = 0.55;
+          const sideDir = [+1, -1];
+          const fieldEdge = FIELD.size / 2 - 0.10;
+          // Partners hang from the anchor: offset slightly below it so they
+          // appear latched on rather than floating alongside.
+          const partnerDropY = ROBOT.size * 0.7; // ≈ one chassis height below anchor
+          for (let pi = 0; pi < 2; pi++) {
+            const s = sideDir[pi] * sideMag;
+            let px = anchorPos.x + perp.x * s;
+            let pz = anchorPos.z + perp.z * s;
+            const py = Math.max(0, anchorPos.y - partnerDropY);
+            px = Math.max(-fieldEdge, Math.min(fieldEdge, px));
+            pz = Math.max(-fieldEdge, Math.min(fieldEdge, pz));
+            setRobotPosition(partners[pi], px, py, pz);
+            setCarryCount(partners[pi], 0);
+          }
 
           let z;
           if (onGround || frac < 0.01) z = 'Contact';
@@ -969,38 +952,8 @@ export function createScheduler(world) {
           else if (frac < 0.667)        z = 'Z2';
           else                          z = 'Z3';
 
-          // All active robots (anchor + partners) get the anchor's zone.
-          // Visually: robots 1–2 hang near the brace; robots 3+ stay at ground
-          // approach positions but score as if fully elevated (chain climb).
-          const perp = bracePerp[allianceKey];
-          const sideMag = 0.55;
-          const sideDir = [+1, -1];
-          const fieldEdge = FIELD.size / 2 - 0.10;
-          const partnerDropY = ROBOT.size * 0.7;
-
-          for (let pi = 1; pi < count; pi++) {
-            const partner = robots[allianceKey][pi];
-            if (pi <= 2) {
-              // Hang visually near the anchor.
-              const s = sideDir[pi - 1] * sideMag;
-              let px = anchorPos.x + perp.x * s;
-              let pz = anchorPos.z + perp.z * s;
-              const py = Math.max(0, anchorPos.y - partnerDropY);
-              px = Math.max(-fieldEdge, Math.min(fieldEdge, px));
-              pz = Math.max(-fieldEdge, Math.min(fieldEdge, pz));
-              setRobotPosition(partner, px, py, pz);
-            } else {
-              // Extra robots: remain at their approach positions on the ground.
-              const approach = climbApproachTargets[allianceKey][pi];
-              setRobotPosition(partner, approach.x, 0, approach.z);
-            }
-            setCarryCount(partner, 0);
-          }
-
-          state.climbZones[allianceKey] = Array(count).fill(z);
-          state.partnerClimbs[allianceKey] = (z === 'Contact' || z === '—')
-            ? 0
-            : Math.max(0, count - 1);
+          state.climbZones[allianceKey] = [z, z, z];
+          state.partnerClimbs[allianceKey] = (z === 'Contact' || z === '—') ? 0 : 2;
         }
       });
     }
@@ -1008,19 +961,16 @@ export function createScheduler(world) {
     // Sync role badge on each robot (reads live PARAMS so config changes
     // are reflected immediately without a restart).
     for (const alliance of ['red', 'blue']) {
-      const count = PARAMS.robotCount[alliance];
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < 3; i++) {
         setRobotRole(robots[alliance][i], PARAMS.roles[alliance][i]);
       }
     }
 
     // Collect currently-targeted ball indices so stepBallPhysics can exempt
-    // them from inter-ball collisions. Only check active robots.
+    // them from inter-ball collisions.
     const targeted = new Set();
     for (const alliance of ['red', 'blue']) {
-      const count = PARAMS.robotCount[alliance];
-      for (let i = 0; i < count; i++) {
-        const s = robotStates[alliance][i];
+      for (const s of robotStates[alliance]) {
         if (s.targetBallIdx >= 0) targeted.add(s.targetBallIdx);
       }
     }

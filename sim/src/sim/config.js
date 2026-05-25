@@ -4,8 +4,6 @@ import { ROBOT } from '../field/dims.js';
 // the scheduler / steering layer / human-player tick, so changes apply mid-
 // match without restart. UI bindings in main.js mutate this object directly.
 
-export const MAX_ROBOTS = 10;
-
 export const DEFAULTS = {
   driveSpeed: 1.2,         // m/s
   turnSpeed: 180,          // °/s — angular speed limit when changing heading
@@ -19,18 +17,15 @@ export const DEFAULTS = {
   robotAccuracy: 80,      // % (0-100), robot suppression-unit shot hit rate
   humanAccuracy: 80,      // % (0-100), human throw hit rate
   ballFriction: 0.3,      // m/s², rolling deceleration for pushed balls
-  robotCount: { red: 3, blue: 3 },
   roles: {
-    // Indices 0-2: default preset; 3-9: additional robots default to 'supp'.
-    red:  ['supp', 'shield', 'supp', ...Array(MAX_ROBOTS - 3).fill('supp')],
-    blue: ['supp', 'shield', 'supp', ...Array(MAX_ROBOTS - 3).fill('supp')],
+    red:  ['supp', 'shield', 'supp'],
+    blue: ['supp', 'shield', 'supp'],
   },
 };
 
 function cloneDefaults() {
   return {
     ...DEFAULTS,
-    robotCount: { ...DEFAULTS.robotCount },
     roles: {
       red:  [...DEFAULTS.roles.red],
       blue: [...DEFAULTS.roles.blue],
@@ -47,7 +42,6 @@ export function notify() { for (const fn of listeners) fn(PARAMS); }
 export function resetParams() {
   const d = cloneDefaults();
   for (const k of Object.keys(d)) PARAMS[k] = d[k];
-  PARAMS.robotCount = { ...d.robotCount };
   PARAMS.roles.red  = d.roles.red;
   PARAMS.roles.blue = d.roles.blue;
   notify();

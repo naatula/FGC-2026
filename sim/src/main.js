@@ -14,7 +14,7 @@ import { buildHumanPlayers } from './entities/HumanPlayer.js';
 import { createScheduler } from './sim/scheduler.js';
 import { initRobotList, updateHud, resetHudCache } from './ui/hud.js';
 import { MATCH } from './field/dims.js';
-import { PARAMS, MAX_ROBOTS, resetParams } from './sim/config.js';
+import { PARAMS, resetParams } from './sim/config.js';
 
 // ---------- Three.js scaffolding ----------
 const canvasRoot = document.getElementById('canvas-root');
@@ -63,10 +63,17 @@ const braces = buildBraces(scene);
 const humans = buildHumanPlayers(scene);
 const missPiles = buildMissPiles(scene);
 
-// Create MAX_ROBOTS robot objects per alliance (inactive ones are parked below field).
 const robots = {
-  red:  Array.from({ length: MAX_ROBOTS }, (_, i) => makeRobot(`R${i + 1}`, 'red')),
-  blue: Array.from({ length: MAX_ROBOTS }, (_, i) => makeRobot(`B${i + 1}`, 'blue')),
+  red: [
+    makeRobot('R1', 'red'),
+    makeRobot('R2', 'red'),
+    makeRobot('R3', 'red'),
+  ],
+  blue: [
+    makeRobot('B1', 'blue'),
+    makeRobot('B2', 'blue'),
+    makeRobot('B3', 'blue'),
+  ],
 };
 robots.red.forEach(r => scene.add(r.group));
 robots.blue.forEach(r => scene.add(r.group));
@@ -76,7 +83,7 @@ const wildfire = makeWildfire(scene, extinguisher.spawnSlot);
 const world = { robots, wildfire, suppression, extinguisher, fireShields, braces, humans, missPiles };
 const scheduler = createScheduler(world);
 
-initRobotList(PARAMS.robotCount.red, PARAMS.robotCount.blue);
+initRobotList();
 
 // ---------- Sim clock & playback controls ----------
 let playing = false;
@@ -142,48 +149,6 @@ const SLIDER_KEYS = [
   ['ballFriction', (v) => v.toFixed(1)],
 ];
 
-// ---------- Role grid (dynamically built from current robot counts) ----------
-function makeRoleSelect(side, idx) {
-  const sel = document.createElement('select');
-  sel.id = `role-${side}-${idx}`;
-  for (const role of ['supp', 'shield', 'fault']) {
-    const opt = document.createElement('option');
-    opt.value = role;
-    opt.textContent = role;
-    sel.appendChild(opt);
-  }
-  sel.value = PARAMS.roles[side][idx] ?? 'supp';
-  sel.addEventListener('change', () => { PARAMS.roles[side][idx] = sel.value; });
-  return sel;
-}
-
-function buildRoleGrid() {
-  const grid = document.getElementById('role-grid');
-  grid.innerHTML = '';
-  const maxCount = Math.max(PARAMS.robotCount.red, PARAMS.robotCount.blue);
-  if (maxCount === 0) return;
-  for (let i = 0; i < maxCount; i++) {
-    const hasRed  = i < PARAMS.robotCount.red;
-    const hasBlue = i < PARAMS.robotCount.blue;
-
-    const rLabel = document.createElement('span');
-    rLabel.className = 'rk';
-    rLabel.style.color = hasRed ? 'var(--red)' : 'transparent';
-    rLabel.textContent = hasRed ? `R${i + 1}` : '—';
-    grid.appendChild(rLabel);
-
-    grid.appendChild(hasRed ? makeRoleSelect('red', i) : document.createElement('span'));
-
-    const bLabel = document.createElement('span');
-    bLabel.className = 'rk';
-    bLabel.style.color = hasBlue ? 'var(--blue)' : 'transparent';
-    bLabel.textContent = hasBlue ? `B${i + 1}` : '—';
-    grid.appendChild(bLabel);
-
-    grid.appendChild(hasBlue ? makeRoleSelect('blue', i) : document.createElement('span'));
-  }
-}
-
 function refreshCfgUI() {
   for (const [key, fmt] of SLIDER_KEYS) {
     const input = document.getElementById(`cfg-${key}`);
@@ -192,11 +157,12 @@ function refreshCfgUI() {
     input.value = String(PARAMS[key]);
     out.textContent = fmt(PARAMS[key]);
   }
-  // Robot count displays
-  document.getElementById('cnt-red-val').textContent  = PARAMS.robotCount.red;
-  document.getElementById('cnt-blue-val').textContent = PARAMS.robotCount.blue;
-  // Rebuild role grid to match current counts
-  buildRoleGrid();
+  for (const side of ['red', 'blue']) {
+    for (let i = 0; i < 3; i++) {
+      const sel = document.getElementById(`role-${side}-${i}`);
+      if (sel) sel.value = PARAMS.roles[side][i];
+    }
+  }
 }
 
 for (const [key, fmt] of SLIDER_KEYS) {
@@ -210,31 +176,19 @@ for (const [key, fmt] of SLIDER_KEYS) {
   });
 }
 
-// ---------- Robot count +/- buttons ----------
 for (const side of ['red', 'blue']) {
-  document.getElementById(`cnt-${side}-minus`).addEventListener('click', () => {
-    if (PARAMS.robotCount[side] <= 0) return;
-    PARAMS.robotCount[side]--;
-    document.getElementById(`cnt-${side}-val`).textContent = PARAMS.robotCount[side];
-    buildRoleGrid();
-    initRobotList(PARAMS.robotCount.red, PARAMS.robotCount.blue);
-    doRestart();
-  });
-  document.getElementById(`cnt-${side}-plus`).addEventListener('click', () => {
-    if (PARAMS.robotCount[side] >= MAX_ROBOTS) return;
-    PARAMS.robotCount[side]++;
-    document.getElementById(`cnt-${side}-val`).textContent = PARAMS.robotCount[side];
-    buildRoleGrid();
-    initRobotList(PARAMS.robotCount.red, PARAMS.robotCount.blue);
-    doRestart();
-  });
+  for (let i = 0; i < 3; i++) {
+    const sel = document.getElementById(`role-${side}-${i}`);
+    if (!sel) continue;
+    sel.addEventListener('change', () => {
+      PARAMS.roles[side][i] = sel.value;
+    });
+  }
 }
 
 document.getElementById('cfg-reset').addEventListener('click', () => {
   resetParams();
   refreshCfgUI();
-  initRobotList(PARAMS.robotCount.red, PARAMS.robotCount.blue);
-  doRestart();
 });
 
 const btnConfig = document.getElementById('btn-config');
