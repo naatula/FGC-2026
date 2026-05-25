@@ -51,9 +51,8 @@ export function buildExtinguisher(scene) {
   slot.position.set(0, EXTINGUISHER.baseSlotHeight / 2, -EXTINGUISHER.depth / 2 + 0.02);
   g.add(slot);
 
-  // Containment fill visualization — proxy pool of 48 spheres scaled to
-  // fill fraction so the extinguisher doesn't carry 500 hidden meshes.
-  const MAX_FILL_PROXY = 48;
+  // Containment fill visualization — one mesh per possible ball.
+  const MAX_FILL_PROXY = WILDFIRE.count;
   const fillGroup = new THREE.Group();
   const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 8, 6);
   const ballMat = new THREE.MeshStandardMaterial({
@@ -133,7 +132,7 @@ export function updateExtinguisherFill(ext, ballsContained, totalCapacity = 100)
   ext.led.scale.y = Math.max(0.001, frac);
   ext.led.position.y = (EXTINGUISHER.openingHeight * 0.7 * frac) / 2;
   const n = ext.fillGroup.children.length;
-  const visibleCount = Math.round(frac * n);
+  const visibleCount = Math.min(n, ballsContained);
   for (let i = 0; i < n; i++) {
     ext.fillGroup.children[i].visible = i < visibleCount;
   }

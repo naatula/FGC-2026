@@ -217,6 +217,7 @@ export function createScheduler(world) {
       headingAngle: 0,      // current visual heading in radians (Three.js rotation.y)
       reversing: false,     // hysteresis flag for non-holonomic forward/reverse mode
       approachLocked: false, // heading frozen during final-approach gate
+      stuckTimer: 0,         // seconds since last meaningful progress toward current target
     };
   }
 
@@ -331,6 +332,7 @@ export function createScheduler(world) {
         s.headingAngle = 0;
         s.reversing = false;
         s.approachLocked = false;
+        s.stuckTimer = 0;
         setRobotPosition(r, p.x, 0, p.z);
         setRobotHeading(r, 0, 1);
         setCarryCount(r, 0);
@@ -629,6 +631,9 @@ export function createScheduler(world) {
     const speed = PARAMS.driveSpeed;
     const maxStep = speed * dt;
 
+    // Accumulate stuck time so callers can detect a robot making no progress.
+    s.stuckTimer += dt;
+
     // Snap when close enough that one frame of driving would overshoot.
     if (dist <= maxStep + 0.01) {
       s.pos.x = targetX;
@@ -726,17 +731,19 @@ export function createScheduler(world) {
         const lane = lanes.swim[s.alliance][s.idx];
         const others = gatherOthers(s);
         const idx = pickBallNoConflict(s, lane.xRange, lane.zRange, others);
-        if (idx >= 0) { s.targetBallIdx = idx; claimed.add(idx); }
+        if (idx >= 0) { s.targetBallIdx = idx; claimed.add(idx); s.stuckTimer = 0; }
       } else {
         const b = wildfire.balls[s.targetBallIdx];
         if (!b || b.state !== 'field') {
           claimed.delete(s.targetBallIdx);
           s.targetBallIdx = -1;
+          s.stuckTimer = 0;
         } else {
           const reached = driveToward(s, b.pos.x, b.pos.z, dt);
           if (reached) {
             claimed.delete(s.targetBallIdx);
             s.targetBallIdx = -1;
+            s.stuckTimer = 0;
           }
         }
       }
@@ -760,10 +767,22 @@ export function createScheduler(world) {
         if (idx >= 0) {
           s.targetBallIdx = idx;
           claimed.add(idx);
+          s.stuckTimer = 0;
         } else {
-          // No balls left in lane; go score whatever we have.
-          if (s.carry > 0) { s.phase = 'toScore'; s.expelTimer = 0; }
-          // else idle - try again next tick
+          // No balls left in lane; go score whatever we have, otherwise
+          // drift toward the swim-lane staging point so the robot stays
+          // mobile and pre-positioned for when a ball frees up.
+          if (s.carry > 0) { s.phase = 'toScore'; s.expelTimer = 0; s.stuckTimer = 0; }
+          else {
+            // Nothing to do — return to spawn and wait for a ball to free up.
+            const spawn = startPositions[s.alliance][s.idx];
+            driveToward(s, spawn.x, spawn.z, dt);
+            // driveToward moved s.pos but we return before the bottom-of-function
+            // sync block — keep the Three.js mesh and ball-push in lock-step.
+            setRobotPosition(robot, s.pos.x, 0, s.pos.z);
+            stepHeading(s, robot);
+            pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, -1);
+          }
           return;
         }
       }
@@ -778,12 +797,26 @@ export function createScheduler(world) {
       if (isBallNearOtherRobot(b.pos.x, b.pos.z, gatherOthers(s))) {
         claimed.delete(s.targetBallIdx);
         s.targetBallIdx = -1;
+        s.stuckTimer = 0;
         return;
       }
       const reached = driveToward(s, b.pos.x, b.pos.z, dt);
       if (reached) {
         s.phase = 'pickingUp';
         s.pickupTimer = PARAMS.pickupTime;
+      } else if (s.stuckTimer > 4.0) {
+        // Robot has been driving toward this ball for too long without reaching
+        // it — obstacle or conflict is blocking the route. Release the claim
+        // and let the robot pick a different target next tick.
+        console.log(
+          `[stuck] ${s.alliance[0].toUpperCase()}${s.idx + 1} | toPickup → release ball #${s.targetBallIdx}` +
+          ` | stuck ${s.stuckTimer.toFixed(2)}s` +
+          ` | pos (${s.pos.x.toFixed(2)}, ${s.pos.z.toFixed(2)})` +
+          ` | ball (${b.pos.x.toFixed(2)}, ${b.pos.z.toFixed(2)})`
+        );
+        claimed.delete(s.targetBallIdx);
+        s.targetBallIdx = -1;
+        s.stuckTimer = 0;
       }
     } else if (s.phase === 'pickingUp') {
       s.pickupTimer -= dt;
@@ -801,8 +834,10 @@ export function createScheduler(world) {
         if (s.carry >= capacity) {
           s.phase = 'toScore';
           s.expelTimer = 0;
+          s.stuckTimer = 0;
         } else {
           s.phase = 'toPickup';
+          s.stuckTimer = 0;
         }
       }
     } else if (s.phase === 'toScore') {
@@ -811,6 +846,30 @@ export function createScheduler(world) {
       if (reached) {
         s.phase = 'expelling';
         s.expelTimer = 0;
+        s.stuckTimer = 0;
+      } else if (s.stuckTimer > 5.0) {
+        // Can't reach the anchor — retreat to spawn and re-approach from a
+        // fresh angle rather than teleporting.
+        console.log(
+          `[stuck] ${s.alliance[0].toUpperCase()}${s.idx + 1} | toScore → toStart (retreat to spawn)` +
+          ` | stuck ${s.stuckTimer.toFixed(2)}s` +
+          ` | pos (${s.pos.x.toFixed(2)}, ${s.pos.z.toFixed(2)})` +
+          ` | carry ${s.carry}`
+        );
+        s.phase = 'toStart';
+        s.stuckTimer = 0;
+      }
+    } else if (s.phase === 'toStart') {
+      // Retreat to spawn point, then resume whatever the robot needs to do.
+      const spawn = startPositions[s.alliance][s.idx];
+      const reached = driveToward(s, spawn.x, spawn.z, dt);
+      if (reached) {
+        console.log(
+          `[stuck] ${s.alliance[0].toUpperCase()}${s.idx + 1} | toStart → ${s.carry > 0 ? 'toScore' : 'toPickup'} (spawn reached)` +
+          ` | pos (${s.pos.x.toFixed(2)}, ${s.pos.z.toFixed(2)})`
+        );
+        s.phase = s.carry > 0 ? 'toScore' : 'toPickup';
+        s.stuckTimer = 0;
       }
     } else if (s.phase === 'expelling') {
       const interval = (role === 'shield') ? PARAMS.transferInterval : PARAMS.shootInterval;
@@ -834,6 +893,7 @@ export function createScheduler(world) {
         }
         if (s.carry === 0) {
           s.phase = 'toPickup';
+          s.stuckTimer = 0;
         }
       }
     }

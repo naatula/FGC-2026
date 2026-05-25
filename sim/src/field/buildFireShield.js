@@ -164,9 +164,8 @@ export function buildFireShields(scene) {
     floor.position.y = 0.015;
     group.add(floor);
 
-    // Ball pile for queue visualization — proxy pool of 24 spheres scaled
-    // to queue depth, replacing 500 hidden meshes per shield.
-    const MAX_FILL_PROXY = 24;
+    // Ball pile for queue visualization — one mesh per possible ball.
+    const MAX_FILL_PROXY = WILDFIRE.count;
     const fillGroup = new THREE.Group();
     const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 8, 6);
     const ballMat = new THREE.MeshStandardMaterial({ color: COLORS.wildfire, roughness: 0.65 });
@@ -250,10 +249,8 @@ export function setGateOpen(shield, open) {
 
 export function updateFireShieldFill(shield, ballsContained, color = '#f0b840') {
   paintCountBadge(shield.countBadge, ballsContained, color);
-  const QUEUE_CAP = 20; // reference max for visual scaling
-  const frac = Math.min(1, ballsContained / QUEUE_CAP);
   const n = shield.fillGroup.children.length;
-  const visibleCount = Math.round(frac * n);
+  const visibleCount = Math.min(n, ballsContained);
   for (let i = 0; i < n; i++) {
     shield.fillGroup.children[i].visible = i < visibleCount;
   }

@@ -134,10 +134,8 @@ function makeUnit(color, ledColor) {
   led.position.set(0, 0, -d / 2 + 0.05);
   g.add(led);
 
-  // Containment fill — proxy pool of MAX_FILL_PROXY spheres (instead of
-  // one-per-ball) so the scene doesn't carry 500 hidden meshes per unit.
-  // visibleCount is scaled proportionally by updateSuppressionFill().
-  const MAX_FILL_PROXY = 48;
+  // Containment fill — one mesh per possible ball.
+  const MAX_FILL_PROXY = WILDFIRE.count;
   const fillGroup = new THREE.Group();
   const ballGeo = new THREE.SphereGeometry(WILDFIRE.radius, 8, 6);
   const ballMat = new THREE.MeshStandardMaterial({
@@ -214,9 +212,8 @@ export function updateSuppressionFill(unit, ballsContained, totalCapacity = 180)
   unit.led.scale.y = Math.max(0.001, frac);
   unit.led.position.y = (SUPPRESSION.canopyHeight * frac) / 2;
 
-  // Scale visible proxies to fill fraction rather than one-per-ball.
   const n = unit.fillGroup.children.length;
-  const visibleCount = Math.round(frac * n);
+  const visibleCount = Math.min(n, ballsContained);
   for (let i = 0; i < n; i++) {
     unit.fillGroup.children[i].visible = i < visibleCount;
   }
