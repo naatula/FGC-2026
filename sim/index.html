@@ -305,22 +305,6 @@
     }
     #config-panel .cfg-reset:hover { border-color: var(--gold); }
 
-    /* Legend / footer */
-    #legend {
-      position: absolute;
-      bottom: 14px;
-      left: 14px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      font-size: 0.72rem;
-      color: var(--muted);
-      max-width: 260px;
-      line-height: 1.5;
-    }
-    #legend strong { color: var(--text); }
-
     /* Narrow viewports: stack canvas on top, panels in flow below */
     @media (max-width: 1199px) {
       html, body {
@@ -343,8 +327,7 @@
       #banner,
       #side,
       #controls,
-      #config-panel,
-      #legend {
+      #config-panel {
         position: static;
         transform: none;
         inset: auto;
@@ -394,10 +377,6 @@
       #controls {
         flex-wrap: wrap;
         justify-content: center;
-      }
-      #legend {
-        max-width: none;
-        margin-bottom: 16px;
       }
     }
   </style>
@@ -545,13 +524,6 @@
       <select id="role-blue-2"><option value="supp">supp</option><option value="shield">shield</option><option value="fault">fault</option></select>
     </div>
     <button id="cfg-reset" class="cfg-reset">Reset to defaults</button>
-  </div>
-
-  <div id="legend">
-    <strong>FGC 2026 — Igniting Innovation</strong><br/>
-    Six robots, 500 wildfire, 2:30 match. Click <em>Play</em> to run the
-    optimal-strategy scenario (rush → sustained → climb → coopertition).
-    Drag to orbit, scroll to zoom.
   </div>
 
   <script type="module" src="/src/main.js"></script>
