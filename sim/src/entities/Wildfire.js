@@ -28,18 +28,22 @@ const _shieldOffX = _shieldWallLen * Math.cos(_shieldAngleRad);  // ≈ 0.693
 const _shieldOffZ = _shieldWallLen * Math.sin(_shieldAngleRad);  // ≈ 0.40
 const _shieldExtension = 1.00;
 const _exclusions = [
+  // --- Game element vicinity ---
+  // Right suppression unit
   {
     minX: _sUnitX - SUPPRESSION.width / 2 - _inflate,
     maxX: _sUnitX + SUPPRESSION.width / 2 + _inflate,
     minZ: -_half - _inflate,
     maxZ: -_half + SUPPRESSION.depth + _inflate,
   },
+  // Left suppression unit
   {
     minX: -_sUnitX - SUPPRESSION.width / 2 - _inflate,
     maxX: -_sUnitX + SUPPRESSION.width / 2 + _inflate,
     minZ: -_half - _inflate,
     maxZ: -_half + SUPPRESSION.depth + _inflate,
   },
+  // Extinguisher
   {
     minX: -EXTINGUISHER.width / 2 - _inflate,
     maxX:  EXTINGUISHER.width / 2 + _inflate,
@@ -60,6 +64,15 @@ const _exclusions = [
     minZ: _half - _shieldExtension - _shieldOffZ - _inflate,
     maxZ: _half + _inflate,
   },
+  // --- Field edge strips (guardrail vicinity) ---
+  // Bottom wall (−Z)
+  { minX: -_half, maxX: _half, minZ: -_half, maxZ: -_half + _inflate },
+  // Top wall (+Z)
+  { minX: -_half, maxX: _half, minZ:  _half - _inflate, maxZ: _half },
+  // Left wall (−X)
+  { minX: -_half, maxX: -_half + _inflate, minZ: -_half, maxZ: _half },
+  // Right wall (+X)
+  { minX:  _half - _inflate, maxX: _half,  minZ: -_half, maxZ: _half },
 ];
 
 export function isInExclusionZone(x, z) {
