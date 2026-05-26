@@ -783,11 +783,11 @@ export function createScheduler(world) {
           // mobile and pre-positioned for when a ball frees up.
           if (s.carry > 0) { s.phase = 'toScore'; s.expelTimer = 0; s.stuckTimer = 0; }
           else {
-            // Nothing to do — return to spawn and wait for a ball to free up.
-            const spawn = startPositions[s.alliance][s.idx];
-            driveToward(s, spawn.x, spawn.z, dt);
-            // driveToward moved s.pos but we return before the bottom-of-function
-            // sync block — keep the Three.js mesh and ball-push in lock-step.
+            // No balls available anywhere right now — stay in place rather than
+            // making a wasteful trip back to the spawn edge.  The unrestricted
+            // fallback inside pickBallNoConflict already searched the entire
+            // field, so driving toward a fixed spawn point would only cause a
+            // long centre-crossing detour before the next ball appears.
             setRobotPosition(robot, s.pos.x, 0, s.pos.z);
             stepHeading(s, robot);
             pushBallsFromRobot(wildfire.balls, s.pos.x, s.pos.z, -1);
