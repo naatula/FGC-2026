@@ -130,6 +130,12 @@ export function createScheduler(world) {
     const v = PARAMS.driveSpeed;
     const omega = PARAMS.turnSpeed * (Math.PI / 180); // rad/s
     let x = s.pos.x, z = s.pos.z, heading = s.headingAngle;
+    // Inherit the robot's live hysteresis state so the rollout uses the same
+    // forward/reverse logic as driveToward (same ENTER_REVERSE / EXIT_REVERSE
+    // thresholds, same sticky mode).  Previously this recomputed a plain 90-deg
+    // threshold every step, which diverged from the real driver's behaviour for
+    // balls in the 70-110-deg band and caused suboptimal ball selection.
+    let reversing = s.reversing;
     let t = 0;
     while (t < DRIVE_SIM_MAX_T) {
       const dx = targetX - x;
@@ -142,17 +148,20 @@ export function createScheduler(world) {
       let rawDiff = rawAngle - heading;
       while (rawDiff >  Math.PI) rawDiff -= 2 * Math.PI;
       while (rawDiff < -Math.PI) rawDiff += 2 * Math.PI;
-      // Reverse when the goal is behind the robot — back in instead of turning
-      // all the way around.
-      const reverse = Math.abs(rawDiff) > Math.PI / 2;
-      const effTarget = reverse ? rawAngle + Math.PI : rawAngle;
+      // Mirror driveToward's hysteresis — same thresholds, same sticky state.
+      if (reversing) {
+        if (Math.abs(rawDiff) < EXIT_REVERSE)  reversing = false;
+      } else {
+        if (Math.abs(rawDiff) > ENTER_REVERSE) reversing = true;
+      }
+      const effTarget = reversing ? rawAngle + Math.PI : rawAngle;
       let turnDiff = effTarget - heading;
       while (turnDiff >  Math.PI) turnDiff -= 2 * Math.PI;
       while (turnDiff < -Math.PI) turnDiff += 2 * Math.PI;
       const maxTurn = omega * DRIVE_SIM_DT;
       heading += Math.sign(turnDiff) * Math.min(Math.abs(turnDiff), maxTurn);
       const driveScale = Math.max(0, Math.cos(turnDiff));
-      const fwd = reverse ? -1 : 1;
+      const fwd = reversing ? -1 : 1;
       x += Math.sin(heading) * step * driveScale * fwd;
       z += Math.cos(heading) * step * driveScale * fwd;
       t += DRIVE_SIM_DT;
