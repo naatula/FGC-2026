@@ -12,7 +12,7 @@ import { makeRobot } from './entities/Robot.js';
 import { makeWildfire } from './entities/Wildfire.js';
 import { buildHumanPlayers } from './entities/HumanPlayer.js';
 import { createScheduler } from './sim/scheduler.js';
-import { initRobotList, updateHud, resetHudCache } from './ui/hud.js';
+import { updateHud, resetHudCache } from './ui/hud.js';
 import { MATCH } from './field/dims.js';
 import { PARAMS, resetParams } from './sim/config.js';
 
@@ -82,8 +82,6 @@ const wildfire = makeWildfire(scene, extinguisher.spawnSlot);
 
 const world = { robots, wildfire, suppression, extinguisher, fireShields, braces, humans, missPiles };
 const scheduler = createScheduler(world);
-
-initRobotList();
 
 // ---------- Sim clock & playback controls ----------
 let playing = false;

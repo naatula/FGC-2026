@@ -56,7 +56,7 @@
       display: grid;
       grid-template-columns: 1fr auto 1fr;
       gap: 14px;
-      align-items: center;
+      align-items: stretch;
       min-width: 720px;
       pointer-events: none;
     }
@@ -99,6 +99,9 @@
       padding: 10px 22px;
       text-align: center;
       min-width: 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     #timer-label {
       font-size: 0.7rem;
@@ -139,52 +142,50 @@
       border-color: var(--gold);
     }
 
-    /* Side panel */
-    #side {
+    /* Score graph panel */
+    #score-graph {
       position: absolute;
       top: 12px;
       right: 12px;
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 12px 14px;
+      padding: 10px 12px 8px;
       width: 240px;
-      font-size: 0.78rem;
       pointer-events: none;
     }
-    #side h3 {
+    #score-graph h3 {
       font-size: 0.7rem;
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--muted);
       margin-bottom: 6px;
     }
-    #side .row {
+    #graph-canvas {
+      width: 100%;
+      height: 120px;
+      display: block;
+    }
+    #graph-legend {
       display: flex;
       justify-content: space-between;
-      padding: 3px 0;
-      border-bottom: 1px dashed rgba(255,255,255,0.05);
-    }
-    #side .row:last-child { border-bottom: none; }
-    #side .robot-dot {
-      display: inline-block; width: 9px; height: 9px;
-      border-radius: 50%; margin-right: 6px; vertical-align: middle;
-    }
-    #side .robot-dot.r { background: var(--red); }
-    #side .robot-dot.b { background: var(--blue); }
-    #side .zone-tag {
-      font-weight: 700;
-      padding: 1px 7px;
-      border-radius: 8px;
-      font-size: 0.7rem;
-      background: #2a2a3a;
+      margin-top: 5px;
+      font-size: 0.65rem;
       color: var(--muted);
     }
-    #side .zone-tag.contact { background: #3a3a55; color: #c8c8d8; }
-    #side .zone-tag.z1 { background: #364b8a; color: #cfe; }
-    #side .zone-tag.z2 { background: #46519a; color: #def; }
-    #side .zone-tag.z3 { background: var(--gold); color: #111; }
-    #side hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
+    #graph-legend .leg-col { display: flex; flex-direction: column; gap: 2px; }
+    #graph-legend .leg-row { display: flex; align-items: center; gap: 4px; }
+    #graph-legend .leg-line {
+      width: 18px; height: 2px; border-radius: 1px; flex-shrink: 0;
+    }
+    #graph-legend .leg-line.red-solid  { background: #e8394a; }
+    #graph-legend .leg-line.blue-solid { background: #3a7fe8; }
+    #graph-legend .leg-line.red-dash {
+      background: repeating-linear-gradient(90deg,rgba(232,57,74,0.55) 0 4px,transparent 4px 7px);
+    }
+    #graph-legend .leg-line.blue-dash {
+      background: repeating-linear-gradient(90deg,rgba(58,127,232,0.55) 0 4px,transparent 4px 7px);
+    }
 
     /* Bottom controls */
     #controls {
@@ -352,8 +353,8 @@
         flex: 0 0 60vh;
       }
       #banner,
-      #side,
       #controls,
+      #score-graph,
       #config-panel {
         position: static;
         transform: none;
@@ -363,6 +364,7 @@
         max-width: 100%;
         pointer-events: auto;
       }
+      #score-graph { pointer-events: none; }
       #banner {
         grid-template-columns: 1fr auto 1fr;
         min-width: 0;
@@ -394,9 +396,6 @@
         font-size: 0.6rem;
         padding: 2px 6px;
         margin-top: 4px;
-      }
-      #side {
-        width: min(100% - 16px, 480px);
       }
       #config-panel {
         width: min(100% - 16px, 480px);
@@ -433,11 +432,6 @@
       <div id="timer">2:30</div>
       <div id="phase">Pre-match</div>
       <div id="coop">Coopertition: —</div>
-      <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">
-        Extinguisher: <span id="ext-count" style="color:var(--text);font-weight:700;">0</span><br/>
-        Queue: <span style="color:var(--red);font-weight:700;" id="queue-red">0</span>
-        / <span style="color:var(--blue);font-weight:700;" id="queue-blue">0</span>
-      </div>
     </div>
 
     <div class="score blue">
@@ -449,15 +443,6 @@
         Extinguisher (shared): <span id="blue-ext">0</span>
       </div>
     </div>
-  </div>
-
-  <div id="side">
-    <h3>Robot Climb Status</h3>
-    <div id="robot-list"></div>
-    <hr/>
-    <div class="row"><span>Red multiplier</span><span id="red-mult-2">×1.00</span></div>
-    <div class="row"><span>Blue multiplier</span><span id="blue-mult-2">×1.00</span></div>
-    <div class="row"><span>Robots in Zone 3</span><span id="z3-count">0 / 6</span></div>
   </div>
 
   <div id="controls">
@@ -476,6 +461,21 @@
       </select>
     </label>
     <button id="btn-config">⚙ Config</button>
+  </div>
+
+  <div id="score-graph">
+    <h3>Score Over Time</h3>
+    <canvas id="graph-canvas"></canvas>
+    <div id="graph-legend">
+      <div class="leg-col">
+        <div class="leg-row"><div class="leg-line red-solid"></div><span>Red ×mult</span></div>
+        <div class="leg-row"><div class="leg-line red-dash"></div><span>Red base</span></div>
+      </div>
+      <div class="leg-col">
+        <div class="leg-row"><div class="leg-line blue-solid"></div><span>Blue ×mult</span></div>
+        <div class="leg-row"><div class="leg-line blue-dash"></div><span>Blue base</span></div>
+      </div>
+    </div>
   </div>
 
   <div id="config-panel">
