@@ -309,6 +309,29 @@
     }
     #config-panel .cfg-reset:hover { border-color: var(--gold); }
 
+    /* Footer links */
+    #footer-links {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      display: flex;
+      gap: 10px;
+      font-size: 0.72rem;
+    }
+    #footer-links a {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 4px 8px;
+      border-radius: 5px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #footer-links a:hover {
+      color: var(--text);
+      border-color: var(--gold);
+    }
+
     /* Narrow viewports: stack canvas on top, panels in flow below */
     @media (max-width: 1199px) {
       html, body {
@@ -380,6 +403,12 @@
       }
       #controls {
         flex-wrap: wrap;
+        justify-content: center;
+      }
+      #footer-links {
+        position: static;
+        inset: auto;
+        margin: 8px auto 16px;
         justify-content: center;
       }
     }
@@ -528,6 +557,11 @@
       <select id="role-blue-2"><option value="supp">supp</option><option value="shield">shield</option><option value="fault">fault</option></select>
     </div>
     <button id="cfg-reset" class="cfg-reset">Reset to defaults</button>
+  </div>
+
+  <div id="footer-links">
+    <a href="https://simonaatula.fi" target="_blank" rel="noopener">About me</a>
+    <a href="https://github.com/naatula/FGC-2026" target="_blank" rel="noopener">Source code</a>
   </div>
 
   <script type="module" src="/src/main.js"></script>
