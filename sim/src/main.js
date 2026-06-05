@@ -1,4 +1,9 @@
 import * as THREE from 'three';
+import { init as initPlausible } from '@plausible-analytics/tracker';
+
+if (!import.meta.env.DEV) {
+  initPlausible({ domain: 'ignitinginnovation.simonaatula.fi', endpoint: 'https://p.otaniemi.org/api/event' });
+}
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { buildField } from './field/buildField.js';

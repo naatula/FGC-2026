@@ -10,6 +10,7 @@
     "lint": "eslint src/ scripts/"
   },
   "dependencies": {
+    "@plausible-analytics/tracker": "^0.4.5",
     "three": "^0.170.0"
   },
   "devDependencies": {
