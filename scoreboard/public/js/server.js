@@ -1,6 +1,5 @@
 import { connect, fmtClock } from './ws.js';
 import { unlockAudio, playStartTone, playEndTone } from './audio.js';
-import { getPhaseName } from './phases.js';
 
 const $ = (id) => document.getElementById(id);
 const setup = $('setup');
@@ -61,9 +60,6 @@ function render(state) {
   timerEl.textContent = fmtClock(state.remainingMs);
   timerEl.className = 'timer' + (state.phase === 'running' ? ' running' : '') + (state.phase === 'ended' ? ' ended' : '');
 
-  const elapsed = state.duration - Math.ceil(state.remainingMs / 1000);
-  $('phase-name').textContent = state.phase === 'idle' ? 'Ready' : getPhaseName(Math.max(0, elapsed));
-
   $('red-score').textContent = state.scores.red;
   $('blue-score').textContent = state.scores.blue;
 
@@ -84,3 +80,40 @@ function detailLine(alliance, mult, partnerClimbs, ext) {
 // after a refresh (still requires a tap, which is what unlocks audio).
 const lastCode = localStorage.getItem('fgc-display-code');
 if (lastCode) $('code-input').value = lastCode;
+
+// Tapping the venue screen goes fullscreen and keeps the display awake —
+// this page is meant to sit untouched on a TV/monitor for the whole event.
+function toggleFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if (req) req.call(el);
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if (exit) exit.call(document);
+    }
+  } catch {
+    // Fullscreen unsupported or blocked — not fatal, ignore.
+  }
+}
+
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator) || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch {
+    wakeLock = null;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') requestWakeLock();
+});
+
+board.addEventListener('click', () => {
+  toggleFullscreen();
+  requestWakeLock();
+});

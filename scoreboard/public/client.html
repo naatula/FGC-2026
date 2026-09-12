@@ -38,17 +38,25 @@
     <button id="btn-set-duration">Set</button>
   </div>
 
-  <div class="alliances-grid">
-    <div class="alliance-card red">
-      <h3>Red Alliance</h3>
-      <div class="score-readout" id="red-score">0</div>
-      <div id="red-steppers"></div>
+  <div class="score-strip">
+    <div class="score-chip red">
+      <div class="label">Red</div>
+      <div class="value" id="red-score">0</div>
     </div>
-    <div class="alliance-card blue">
-      <h3>Blue Alliance</h3>
-      <div class="score-readout" id="blue-score">0</div>
-      <div id="blue-steppers"></div>
+    <div class="score-chip blue">
+      <div class="label">Blue</div>
+      <div class="value" id="blue-score">0</div>
     </div>
+  </div>
+
+  <div class="category-card">
+    <h3 class="category-title">Suppression Balls</h3>
+    <div id="supp-rows"></div>
+  </div>
+
+  <div class="category-card">
+    <h3 class="category-title">Climbing</h3>
+    <div id="climb-rows"></div>
   </div>
 
   <div class="shared-card">

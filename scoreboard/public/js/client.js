@@ -50,42 +50,48 @@ $('btn-set-duration').addEventListener('click', () => {
 });
 
 function buildSteppers(state) {
-  for (const alliance of ['red', 'blue']) {
-    const container = $(`${alliance}-steppers`);
-    container.innerHTML = '';
-    container.appendChild(stepperRow('Suppression balls', alliance, 'supp'));
-    state.climbSlots.forEach((label, slot) => {
-      container.appendChild(stepperRow(label + ' climb', alliance, 'climb', slot));
-    });
-  }
-  container_bindClicks();
+  const suppContainer = $('supp-rows');
+  suppContainer.innerHTML = '';
+  suppContainer.appendChild(dualRow('Balls scored', 'supp'));
+
+  const climbContainer = $('climb-rows');
+  climbContainer.innerHTML = '';
+  state.climbSlots.forEach((label, slot) => {
+    climbContainer.appendChild(dualRow(label, 'climb', slot));
+  });
+
+  bindDualClicks();
 }
 
-function stepperRow(label, alliance, field, slot) {
+function dualRow(label, field, slot) {
   const row = document.createElement('div');
-  row.className = 'stepper-row';
-  row.dataset.alliance = alliance;
+  row.className = 'dual-row';
   row.dataset.field = field;
   if (slot !== undefined) row.dataset.slot = slot;
   row.innerHTML = `
-    <div class="stepper-label">
-      <div class="name">${label}</div>
-      <div class="value" data-role="value">0</div>
-    </div>
-    <div class="stepper-btns">
-      <button class="step-btn minus" data-delta="-1">−</button>
-      <button class="step-btn plus" data-delta="1">+</button>
+    <div class="row-label">${label}</div>
+    <div class="dual-sides">
+      <div class="dual-side red">
+        <button class="step-btn sm minus" data-alliance="red" data-delta="-1">−</button>
+        <div class="dual-value" data-role="value">0</div>
+        <button class="step-btn sm plus" data-alliance="red" data-delta="1">+</button>
+      </div>
+      <div class="dual-side blue">
+        <button class="step-btn sm minus" data-alliance="blue" data-delta="-1">−</button>
+        <div class="dual-value" data-role="value">0</div>
+        <button class="step-btn sm plus" data-alliance="blue" data-delta="1">+</button>
+      </div>
     </div>`;
   return row;
 }
 
-function container_bindClicks() {
-  document.querySelectorAll('.alliances-grid .stepper-btns button').forEach((btn) => {
+function bindDualClicks() {
+  document.querySelectorAll('.dual-row .dual-side button').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const row = btn.closest('.stepper-row');
+      const row = btn.closest('.dual-row');
       socket.send({
         type: 'adjust',
-        alliance: row.dataset.alliance,
+        alliance: btn.dataset.alliance,
         field: row.dataset.field,
         slot: row.dataset.slot !== undefined ? Number(row.dataset.slot) : undefined,
         delta: Number(btn.dataset.delta),
@@ -119,17 +125,17 @@ function render(state) {
   $('blue-score').textContent = state.scores.blue;
   $('ext-value').textContent = state.ext;
 
-  for (const alliance of ['red', 'blue']) {
-    const container = $(`${alliance}-steppers`);
-    container.querySelectorAll('.stepper-row').forEach((row) => {
-      const field = row.dataset.field;
-      const valueEl = row.querySelector('[data-role="value"]');
-      if (field === 'supp') {
-        valueEl.textContent = state[alliance].supp;
-      } else if (field === 'climb') {
-        const slot = Number(row.dataset.slot);
-        valueEl.textContent = state.zones[state[alliance].climb[slot]];
-      }
-    });
-  }
+  document.querySelectorAll('#supp-rows .dual-row, #climb-rows .dual-row').forEach((row) => {
+    const field = row.dataset.field;
+    const redVal = row.querySelector('.dual-side.red [data-role="value"]');
+    const blueVal = row.querySelector('.dual-side.blue [data-role="value"]');
+    if (field === 'supp') {
+      redVal.textContent = state.red.supp;
+      blueVal.textContent = state.blue.supp;
+    } else if (field === 'climb') {
+      const slot = Number(row.dataset.slot);
+      redVal.textContent = state.zones[state.red.climb[slot]];
+      blueVal.textContent = state.zones[state.blue.climb[slot]];
+    }
+  });
 }
