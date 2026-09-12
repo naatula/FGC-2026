@@ -38,3 +38,12 @@ export function playEndTone() {
   tone(330, t0 + 0.45, 0.5, 0.4, 'sawtooth');
   tone(220, t0 + 0.9, 0.9, 0.45, 'sawtooth');
 }
+
+export function playStopTone() {
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  // Two flat low blips — distinct from the rising start tone and the
+  // descending end buzzer, reading as "paused" rather than "finished".
+  tone(300, t0, 0.16, 0.35, 'square');
+  tone(300, t0 + 0.22, 0.16, 0.35, 'square');
+}

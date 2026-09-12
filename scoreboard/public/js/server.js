@@ -1,5 +1,5 @@
 import { connect, fmtClock } from './ws.js';
-import { unlockAudio, playStartTone, playEndTone } from './audio.js';
+import { unlockAudio, playStartTone, playStopTone, playEndTone } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
 const setup = $('setup');
@@ -46,6 +46,7 @@ socket.on('state', ({ state }) => {
 });
 
 socket.on('matchStart', () => playStartTone());
+socket.on('matchStop', () => playStopTone());
 socket.on('matchEnd', () => playEndTone());
 
 socket.on('error', ({ message }) => {
@@ -70,8 +71,8 @@ function render(state) {
   timerEl.textContent = fmtClock(state.remainingMs);
   timerEl.className = 'timer' + (state.phase === 'running' ? ' running' : '') + (state.phase === 'ended' ? ' ended' : '');
 
-  $('red-score').textContent = state.scores.red;
-  $('blue-score').textContent = state.scores.blue;
+  setScoreText($('red-score'), state.scores.red);
+  setScoreText($('blue-score'), state.scores.blue);
 
   $('red-detail').textContent = detailLine(state.red, state.scores.redMult, state.scores.partnerClimbsRed, state.ext);
   $('blue-detail').textContent = detailLine(state.blue, state.scores.blueMult, state.scores.partnerClimbsBlue, state.ext);
@@ -85,6 +86,47 @@ function detailLine(alliance, mult, partnerClimbs, ext) {
   const zoneStr = alliance.climb.map((i) => ['—','C','Z1','Z2','Z3'][i]).join(' / ');
   return `Suppression ${alliance.supp} × ${mult.toFixed(2)}  ·  Climb ${zoneStr}  ·  Partner +${partnerClimbs * 25}  ·  Ext ${ext}`;
 }
+
+// The score digits are huge by design (see .alliance-score), sized off
+// viewport width so they read from across a room. But a viewport-width-only
+// size has no idea how many digits it's rendering — once a score climbs
+// past two digits (or the window gets narrow/tall), the number can outgrow
+// its column and push the whole page into horizontal scroll. Rather than
+// hardcode a digit-count breakpoint, measure the actual rendered width
+// after every change and shrink the font just enough to fit.
+function setScoreText(el, value) {
+  const text = String(value);
+  if (el.textContent === text) return;
+  el.textContent = text;
+  fitScoreText(el);
+}
+
+const MIN_SCORE_FONT_PX = 32;
+
+function fitScoreText(el) {
+  const panel = el.parentElement;
+  if (!panel) return;
+  // Clear any earlier shrink first so we measure against the CSS default
+  // (clamp) size — otherwise a score that goes back down (e.g. after a
+  // reset) would stay shrunk forever.
+  el.style.fontSize = '';
+  const available = panel.clientWidth;
+  const natural = el.scrollWidth;
+  if (!available || natural <= available) return;
+  const currentPx = parseFloat(getComputedStyle(el).fontSize);
+  const fitted = Math.floor(currentPx * (available / natural) * 0.96);
+  el.style.fontSize = `${Math.max(MIN_SCORE_FONT_PX, fitted)}px`;
+}
+
+let resizeRaf = null;
+window.addEventListener('resize', () => {
+  if (resizeRaf) return;
+  resizeRaf = requestAnimationFrame(() => {
+    resizeRaf = null;
+    fitScoreText($('red-score'));
+    fitScoreText($('blue-score'));
+  });
+});
 
 // Pre-fill the join field with this screen's last match code for convenience
 // after a refresh.

@@ -134,6 +134,7 @@ function handleAction(room, msg) {
       room.phase = 'paused';
       stopTick(room);
       broadcastState(room);
+      broadcast(room, { type: 'matchStop' });
       break;
     }
     case 'reset': {
