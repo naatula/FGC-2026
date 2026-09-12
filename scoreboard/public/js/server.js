@@ -34,7 +34,12 @@ $('btn-join').addEventListener('click', () => {
 function showSoundGate(afterUnlock) {
   soundGate.hidden = false;
   $('btn-enable-sound').onclick = () => {
+    // One tap does everything that needs a user gesture: unlock audio, go
+    // fullscreen, and grab a wake lock — so there's no second prompt later
+    // asking the operator to tap the board again.
     unlockAudio();
+    toggleFullscreen();
+    requestWakeLock();
     soundGate.hidden = true;
     afterUnlock();
   };
@@ -100,8 +105,9 @@ function detailLine(alliance, mult, partnerClimbs, ext) {
 const lastCode = localStorage.getItem('fgc-display-code');
 if (lastCode) $('code-input').value = lastCode;
 
-// Tapping the venue screen goes fullscreen and keeps the display awake —
-// this page is meant to sit untouched on a TV/monitor for the whole event.
+// Fullscreen + wake lock, requested up front from the sound-gate tap above.
+// Kept bindable here as a fallback too (e.g. the OS kicks the page out of
+// fullscreen) so tapping the board again re-requests both.
 function toggleFullscreen() {
   try {
     if (!document.fullscreenElement) {
