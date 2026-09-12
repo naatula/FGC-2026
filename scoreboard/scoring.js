@@ -3,7 +3,7 @@
 // simulator. Kept as an independent copy on purpose: this app deploys as a
 // standalone service and should not depend on the sim's source tree.
 
-export const ZONES = ['—', 'Contact', 'Z1', 'Z2', 'Z3'];
+export const ZONES = ['—', 'Ct', 'Z1', 'Z2', 'Z3'];
 const ZONE_INCREMENT = [0, 0.05, 0.10, 0.20, 0.30];
 
 // Each alliance climbs as one anchor + up to two partner robots on the brace.
