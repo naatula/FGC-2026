@@ -6,6 +6,7 @@ const remote = $('remote');
 
 const socket = connect();
 let currentState = null;
+let activeCode = null; // room code once joined — used to silently rejoin after a dropped connection
 
 const savedCode = localStorage.getItem('fgc-remote-code');
 if (savedCode) $('code-input').value = savedCode;
@@ -22,7 +23,15 @@ function join() {
   socket.send({ type: 'joinRoom', code, role: 'remote' });
 }
 
+// If the socket reconnects (network blip, backgrounded tab, phone sleep),
+// silently rejoin the same room instead of leaving the remote stuck showing
+// stale state with dead buttons.
+socket.on('open', () => {
+  if (activeCode) socket.send({ type: 'joinRoom', code: activeCode, role: 'remote' });
+});
+
 socket.on('joined', ({ state }) => {
+  activeCode = state.code;
   localStorage.setItem('fgc-remote-code', state.code);
   setup.hidden = true;
   remote.hidden = false;
@@ -37,6 +46,14 @@ socket.on('state', ({ state }) => {
 
 socket.on('error', ({ message }) => {
   $('error').textContent = message;
+  if (activeCode) {
+    // The room vanished server-side while we were trying to silently
+    // rejoin it — surface the setup screen again instead of leaving the
+    // remote frozen on stale data with no visible feedback.
+    activeCode = null;
+    remote.hidden = true;
+    setup.hidden = false;
+  }
 });
 
 $('btn-start').addEventListener('click', () => socket.send({ type: 'start' }));

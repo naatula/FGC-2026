@@ -8,6 +8,15 @@ const board = $('board');
 
 const socket = connect();
 let joined = false;
+let activeCode = null; // room code once joined/created — used to rejoin after a dropped connection
+
+// If the socket reconnects (network blip, backgrounded tab, phone sleep),
+// silently rejoin the same room instead of leaving the page stuck showing
+// stale state. Sending 'joinRoom' again (never 'createRoom') is what keeps
+// us in the same match rather than spawning a new one.
+socket.on('open', () => {
+  if (activeCode) socket.send({ type: 'joinRoom', code: activeCode, role: 'display' });
+});
 
 $('btn-new').addEventListener('click', () => {
   showSoundGate(() => socket.send({ type: 'createRoom' }));
@@ -33,6 +42,7 @@ function showSoundGate(afterUnlock) {
 
 socket.on('joined', ({ state }) => {
   joined = true;
+  activeCode = state.code;
   setup.hidden = true;
   board.hidden = false;
   localStorage.setItem('fgc-display-code', state.code);
@@ -49,6 +59,15 @@ socket.on('matchEnd', () => playEndTone());
 
 socket.on('error', ({ message }) => {
   $('error').textContent = message;
+  if (joined) {
+    // The room vanished server-side (e.g. a server restart) while we were
+    // trying to silently rejoin it — surface the setup screen again instead
+    // of leaving the board frozen on stale data with no visible feedback.
+    joined = false;
+    activeCode = null;
+    board.hidden = true;
+    setup.hidden = false;
+  }
 });
 
 function render(state) {

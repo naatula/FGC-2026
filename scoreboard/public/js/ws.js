@@ -4,6 +4,8 @@ export function connect() {
   const listeners = new Map();
   let ws;
   let queue = [];
+  let reconnectTimer = null;
+  let livenessTimer = null;
 
   function on(type, cb) {
     if (!listeners.has(type)) listeners.set(type, []);
@@ -23,7 +25,20 @@ export function connect() {
     }
   }
 
+  function scheduleReconnect(delay) {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      open();
+    }, delay);
+  }
+
   function open() {
+    // Never stack a second live socket on top of one that's already
+    // connecting/open (e.g. a scheduled reconnect firing right as the page
+    // becomes visible and triggers its own reconnect check).
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
     ws = new WebSocket(url);
     ws.addEventListener('open', () => {
       emit('open');
@@ -37,10 +52,45 @@ export function connect() {
     });
     ws.addEventListener('close', () => {
       emit('close');
-      setTimeout(open, 1500);
+      scheduleReconnect(1500);
     });
     ws.addEventListener('error', () => ws.close());
   }
+
+  // A backgrounded tab (switching apps, minimizing, screen lock) can leave a
+  // WebSocket that silently died — no 'close' or 'error' event ever fires,
+  // so readyState keeps reporting OPEN even though the connection is dead.
+  // Whenever the page becomes visible again, actively verify the socket:
+  // if it isn't demonstrably open, reconnect immediately; if it claims to
+  // be open, send a liveness ping and force a reconnect if no pong (or any
+  // other message) arrives in time.
+  on('pong', () => {
+    if (livenessTimer) {
+      clearTimeout(livenessTimer);
+      livenessTimer = null;
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+
+    if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      open();
+      return;
+    }
+
+    if (ws.readyState === WebSocket.OPEN && !livenessTimer) {
+      send({ type: 'ping' });
+      livenessTimer = setTimeout(() => {
+        livenessTimer = null;
+        try { ws.close(); } catch { /* already gone */ }
+      }, 4000);
+    }
+  });
 
   open();
   return { on, send };

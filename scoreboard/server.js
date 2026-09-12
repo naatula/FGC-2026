@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 4100;
 
 const DEFAULT_DURATION = 150; // seconds — 2026 FGC match length (Game Manual §2.2)
 const TICK_MS = 200;
-const ROOM_TTL_MS = 8 * 60 * 60 * 1000; // sweep rooms idle longer than 8h
+const ROOM_TTL_MS = 24 * 60 * 60 * 1000; // sweep rooms idle longer than 24h
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -225,7 +225,32 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server, path: '/ws' });
 
+// Backgrounded tabs and flaky mobile connections can leave a socket that
+// looks open but is actually dead ("zombie" connection — no close/error
+// event ever fires). Ping every connection and terminate any that doesn't
+// pong back within one interval, so room membership and viewer counts stay
+// accurate and clients are forced through their reconnect path.
+function markAlive() {
+  this.isAlive = true;
+}
+
+const heartbeatTimer = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 30000);
+
+wss.on('close', () => clearInterval(heartbeatTimer));
+
 wss.on('connection', (ws) => {
+  ws.isAlive = true;
+  ws.on('pong', markAlive);
+
   let conn = null; // { ws, role, room }
 
   ws.on('message', (raw) => {
@@ -233,6 +258,13 @@ wss.on('connection', (ws) => {
     try {
       msg = JSON.parse(raw.toString());
     } catch {
+      return;
+    }
+
+    if (msg.type === 'ping') {
+      // App-level liveness probe from the client (see public/js/ws.js) —
+      // answered unconditionally, even before a room is joined.
+      ws.send(JSON.stringify({ type: 'pong' }));
       return;
     }
 
