@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>FGC Scoreboard — Display</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="setup" class="code-entry">
+  <h1>🖥️ Scoreboard Display</h1>
+  <div class="choice-row">
+    <button id="btn-new" class="big-btn">Start New Match</button>
+  </div>
+  <p class="subtitle">— or add this screen to a match already running —</p>
+  <input id="code-input" class="code-input" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" />
+  <div class="choice-row">
+    <button id="btn-join">Join as Display</button>
+  </div>
+  <p id="error" class="error-msg"></p>
+</div>
+
+<div id="sound-gate" class="sound-gate" hidden>
+  <button id="btn-enable-sound" class="big-btn">🔊 Tap to enable match sounds</button>
+</div>
+
+<div id="board" class="board" hidden>
+  <div class="board-header">
+    <div>Join code: <span id="join-code" class="join-code-tag">----</span></div>
+    <div class="viewer-count" id="viewer-count"></div>
+  </div>
+  <div class="board-main">
+    <div class="alliance-panel red">
+      <div class="alliance-label">Red Alliance</div>
+      <div class="alliance-score" id="red-score">0</div>
+      <div class="alliance-detail" id="red-detail"></div>
+    </div>
+    <div class="center-panel">
+      <div class="phase-name" id="phase-name">—</div>
+      <div class="timer" id="timer">0:00</div>
+      <div class="coop-line" id="coop-line"></div>
+    </div>
+    <div class="alliance-panel blue">
+      <div class="alliance-label">Blue Alliance</div>
+      <div class="alliance-score" id="blue-score">0</div>
+      <div class="alliance-detail" id="blue-detail"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/server.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>FGC Scoreboard — Remote</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="setup" class="code-entry">
+  <h1>📱 Remote Control</h1>
+  <p class="subtitle">Enter the match code shown on the scoreboard display</p>
+  <input id="code-input" class="code-input" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" inputmode="text" />
+  <div class="choice-row">
+    <button id="btn-join" class="big-btn">Join Match</button>
+  </div>
+  <p id="error" class="error-msg"></p>
+</div>
+
+<div id="remote" class="remote" hidden>
+  <div class="remote-header">
+    <span class="join-code-tag" id="join-code">----</span>
+    <span class="viewer-count" id="viewer-count"></span>
+  </div>
+
+  <div class="timer-strip">
+    <div class="timer" id="timer">0:00</div>
+    <div class="timer-controls">
+      <button id="btn-start">▶ Start</button>
+      <button id="btn-stop">⏸ Stop</button>
+      <button id="btn-reset">↺ Reset</button>
+    </div>
+  </div>
+  <div class="duration-row">
+    Match length (s):
+    <input id="duration-input" type="number" min="10" step="5" />
+    <button id="btn-set-duration">Set</button>
+  </div>
+
+  <div class="alliances-grid">
+    <div class="alliance-card red">
+      <h3>Red Alliance</h3>
+      <div class="score-readout" id="red-score">0</div>
+      <div id="red-steppers"></div>
+    </div>
+    <div class="alliance-card blue">
+      <h3>Blue Alliance</h3>
+      <div class="score-readout" id="blue-score">0</div>
+      <div id="blue-steppers"></div>
+    </div>
+  </div>
+
+  <div class="shared-card">
+    <h3>Extinguisher</h3>
+    <div class="stepper-row" style="flex:1">
+      <div class="stepper-label">
+        <div class="name">Balls scored (shared)</div>
+        <div class="value" id="ext-value">0</div>
+      </div>
+      <div class="stepper-btns">
+        <button class="step-btn minus" data-alliance="shared" data-field="ext" data-delta="-1">−</button>
+        <button class="step-btn plus" data-alliance="shared" data-field="ext" data-delta="1">+</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="footer-note">Scoring follows the 2026 FGC Game Manual §3.6 regional score formula.</p>
+</div>
+
+<script type="module" src="js/client.js"></script>
+</body>
+</html>

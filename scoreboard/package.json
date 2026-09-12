@@ -1,0 +1,14 @@
+{
+  "name": "fgc-scoreboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Live match scoreboard + remote scorekeeping for the 2026 FGC Igniting Innovation game",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
