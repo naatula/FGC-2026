@@ -1,0 +1,24 @@
+# FGC Scoreboard production stack.
+# TLS and the public hostname are handled by the existing reverse proxy
+# (Caddy). This stack just publishes the app on a local port for Caddy to
+# forward to.
+#
+#   docker compose up -d --build
+#   Point Caddy at 127.0.0.1:${SCOREBOARD_PORT:-4100}
+
+services:
+  scoreboard:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    environment:
+      PORT: "4100"
+    ports:
+      - "${SCOREBOARD_BIND:-127.0.0.1}:${SCOREBOARD_PORT:-4100}:4100"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4100/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
