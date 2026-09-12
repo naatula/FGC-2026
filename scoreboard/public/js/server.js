@@ -3,8 +3,8 @@ import { unlockAudio, playStartTone, playEndTone } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
 const setup = $('setup');
-const soundGate = $('sound-gate');
 const board = $('board');
+const tapHint = $('tap-hint');
 
 const socket = connect();
 let joined = false;
@@ -19,7 +19,7 @@ socket.on('open', () => {
 });
 
 $('btn-new').addEventListener('click', () => {
-  showSoundGate(() => socket.send({ type: 'createRoom' }));
+  socket.send({ type: 'createRoom' });
 });
 
 $('btn-join').addEventListener('click', () => {
@@ -28,22 +28,8 @@ $('btn-join').addEventListener('click', () => {
     $('error').textContent = 'Enter the 4-character match code.';
     return;
   }
-  showSoundGate(() => socket.send({ type: 'joinRoom', code, role: 'display' }));
+  socket.send({ type: 'joinRoom', code, role: 'display' });
 });
-
-function showSoundGate(afterUnlock) {
-  soundGate.hidden = false;
-  $('btn-enable-sound').onclick = () => {
-    // One tap does everything that needs a user gesture: unlock audio, go
-    // fullscreen, and grab a wake lock — so there's no second prompt later
-    // asking the operator to tap the board again.
-    unlockAudio();
-    toggleFullscreen();
-    requestWakeLock();
-    soundGate.hidden = true;
-    afterUnlock();
-  };
-}
 
 socket.on('joined', ({ state }) => {
   joined = true;
@@ -101,13 +87,10 @@ function detailLine(alliance, mult, partnerClimbs, ext) {
 }
 
 // Pre-fill the join field with this screen's last match code for convenience
-// after a refresh (still requires a tap, which is what unlocks audio).
+// after a refresh.
 const lastCode = localStorage.getItem('fgc-display-code');
 if (lastCode) $('code-input').value = lastCode;
 
-// Fullscreen + wake lock, requested up front from the sound-gate tap above.
-// Kept bindable here as a fallback too (e.g. the OS kicks the page out of
-// fullscreen) so tapping the board again re-requests both.
 function toggleFullscreen() {
   try {
     if (!document.fullscreenElement) {
@@ -138,7 +121,13 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') requestWakeLock();
 });
 
+// No blocking prompt — the board shows immediately. A small hint on the
+// edge (see server.html/#tap-hint) tells the operator that tapping the
+// screen unlocks sound and goes fullscreen; the first tap does all three
+// (audio needs a gesture too), and it fades away once used.
 board.addEventListener('click', () => {
+  unlockAudio();
   toggleFullscreen();
   requestWakeLock();
+  tapHint.classList.add('gone');
 });

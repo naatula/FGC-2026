@@ -207,15 +207,17 @@ a { color: inherit; }
 .timer.ended { color: var(--red); }
 .coop-line { color: var(--text-dim); font-size: 0.95rem; }
 
-.sound-gate {
+.tap-hint {
   position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
+  right: 0.8rem;
+  bottom: 0.6rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  opacity: 0.8;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
 }
+.tap-hint.gone { opacity: 0; }
 
 /* ---------- remote control ---------- */
 
